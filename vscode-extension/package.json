@@ -1,0 +1,119 @@
+{
+  "name": "crosscheck-ai",
+  "displayName": "crosscheck-ai",
+  "description": "Multi-agent AI code review inline in VS Code — real-time observer + Fix with Crosscheck button",
+  "version": "0.1.0",
+  "publisher": "crosscheck-ai",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Linters", "AI"],
+  "keywords": ["ai", "code review", "llm", "multi-agent", "crosscheck"],
+  "icon": "media/icon.png",
+  "repository": { "type": "git", "url": "https://github.com/Nomadu27/crosscheck-ai" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "crosscheck.reviewFile",
+        "title": "crosscheck: Review Current File",
+        "category": "crosscheck"
+      },
+      {
+        "command": "crosscheck.reviewSelection",
+        "title": "crosscheck: Review Selection",
+        "category": "crosscheck"
+      },
+      {
+        "command": "crosscheck.fixWithCrosscheck",
+        "title": "crosscheck: Fix with Crosscheck",
+        "category": "crosscheck"
+      },
+      {
+        "command": "crosscheck.toggleObserver",
+        "title": "crosscheck: Toggle Live Observer",
+        "category": "crosscheck"
+      },
+      {
+        "command": "crosscheck.showReport",
+        "title": "crosscheck: Show Last Report",
+        "category": "crosscheck"
+      }
+    ],
+    "configuration": {
+      "title": "crosscheck-ai",
+      "properties": {
+        "crosscheck.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenRouter API key (or set CROSSCHECK_API_KEY env var)",
+          "secret": true
+        },
+        "crosscheck.mode": {
+          "type": "string",
+          "enum": ["fast", "balanced", "quality"],
+          "default": "balanced",
+          "description": "Review mode preset"
+        },
+        "crosscheck.observerEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable live observer mode (review on every save)"
+        },
+        "crosscheck.observerDebounce": {
+          "type": "number",
+          "default": 1500,
+          "description": "Debounce delay in ms before triggering observer review"
+        },
+        "crosscheck.showInlineDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline issue decorations in the editor"
+        },
+        "crosscheck.autoFix": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically apply Coder fixes when APPROVED"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "crosscheck.reviewSelection",
+          "when": "editorHasSelection",
+          "group": "crosscheck@1"
+        },
+        {
+          "command": "crosscheck.fixWithCrosscheck",
+          "when": "editorTextFocus",
+          "group": "crosscheck@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "crosscheck.reviewFile",
+          "group": "crosscheck"
+        }
+      ]
+    },
+    "statusBar": [
+      {
+        "id": "crosscheck.status",
+        "name": "crosscheck Status",
+        "alignment": "right",
+        "priority": 100
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
