@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crosscheck AI Dev Team</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-theme="dark">
+
+<!-- Header -->
+<div class="header">
+  <h1>crosscheck</h1>
+  <span class="badge">AI Dev Team</span>
+  <span id="conn-status" class="status disconnected">Not started</span>
+  <button class="export-btn" onclick="exportTranscript()">Export</button>
+  <button class="theme-toggle" onclick="toggleTheme()">Theme</button>
+</div>
+
+<!-- Task input screen (shown first) -->
+<div class="main" id="task-screen">
+  <div class="task-input">
+    <h2>Start a Team Session</h2>
+    <p>
+      Describe the task for your AI dev team. Claude will code while
+      GPT-5, DeepSeek, Grok, and Gemini advise, debug, and review.
+    </p>
+    <textarea id="task-textarea" placeholder="e.g. Add authentication to app.py with JWT tokens and role-based access control..." rows="4"></textarea>
+    <button onclick="startTask()">Launch Team</button>
+  </div>
+</div>
+
+<!-- Chat screen (shown after task starts) -->
+<div class="main" id="chat-screen" style="display:none">
+
+  <!-- Phase sidebar -->
+  <div class="phase-sidebar">
+    <h3>Phases</h3>
+    <div class="phase-item" id="phase-planning">
+      <div class="phase-dot"></div>
+      <span>Planning</span>
+    </div>
+    <div class="phase-item" id="phase-discussion">
+      <div class="phase-dot"></div>
+      <span>Discussion</span>
+    </div>
+    <div class="phase-item" id="phase-coding">
+      <div class="phase-dot"></div>
+      <span>Coding</span>
+    </div>
+    <div class="phase-item" id="phase-review">
+      <div class="phase-dot"></div>
+      <span>Review</span>
+    </div>
+    <div class="phase-item" id="phase-done">
+      <div class="phase-dot"></div>
+      <span>Done</span>
+    </div>
+  </div>
+
+  <!-- Chat area -->
+  <div class="chat-area">
+    <div class="chat-messages" id="chat-messages"></div>
+
+    <!-- Input bar -->
+    <div class="input-bar" style="position:relative">
+      <div id="mention-dropdown" class="mention-dropdown"></div>
+      <textarea id="chat-input"
+                placeholder="Talk to the team... Use @role to mention specific agents"
+                rows="1"
+                oninput="autoResize(this)"></textarea>
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- Team panel -->
+  <div class="team-panel">
+    <h3>Team</h3>
+    <div id="team-list"></div>
+  </div>
+
+</div>
+
+<script src="/static/chat.js"></script>
+</body>
+</html>

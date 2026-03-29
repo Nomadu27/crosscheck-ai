@@ -582,3 +582,111 @@ class TestTeamSession:
         # Error messages should be recorded
         error_msgs = [m for m in history.messages if "[Error:" in m.content]
         assert len(error_msgs) > 0
+
+
+# ── Chat Server ─────────────────────────────────────────────────────────────
+
+class TestChatServer:
+    """Tests for crosscheck.chat_server module."""
+
+    def test_create_chat_app_returns_fastapi(self):
+        """create_chat_app should return a FastAPI instance."""
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app(api_key="test-key")
+        assert app is not None
+        assert app.title == "crosscheck AI Dev Team"
+
+    def test_chat_app_has_routes(self):
+        """App should have /, /api/team, and /ws/team routes."""
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app(api_key="test-key")
+        route_paths = [r.path for r in app.routes]
+        assert "/" in route_paths
+        assert "/api/team" in route_paths
+
+    def test_chat_app_team_endpoint(self):
+        """GET /api/team should return team info."""
+        from crosscheck.chat_server import create_chat_app
+        from starlette.testclient import TestClient
+        app = create_chat_app(api_key="test-key")
+        client = TestClient(app)
+        resp = client.get("/api/team")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 6
+        roles = [m["role"] for m in data]
+        assert "planner" in roles
+        assert "coder" in roles
+        assert "debugger" in roles
+
+    def test_chat_app_index_serves_html(self):
+        """GET / should return HTML."""
+        from crosscheck.chat_server import create_chat_app
+        from starlette.testclient import TestClient
+        app = create_chat_app(api_key="test-key")
+        client = TestClient(app)
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "crosscheck" in resp.text.lower()
+
+    def test_chat_ui_files_exist(self):
+        """Chat UI static files should exist."""
+        from pathlib import Path
+        ui_dir = Path(__file__).parent.parent / "crosscheck" / "chat_ui"
+        assert (ui_dir / "index.html").exists()
+        assert (ui_dir / "chat.js").exists()
+        assert (ui_dir / "style.css").exists()
+
+
+# ── CLI Extensions (team + chat) ────────────────────────────────────────────
+
+class TestCLITeamChat:
+    """Tests for team and chat CLI commands."""
+
+    def test_team_cmd_registered(self):
+        """team command should be importable."""
+        from crosscheck.cli_extensions import team_cmd
+        assert team_cmd is not None
+        assert team_cmd.name == "team"
+
+    def test_chat_cmd_registered(self):
+        """chat command should be importable."""
+        from crosscheck.cli_extensions import chat_cmd
+        assert chat_cmd is not None
+        assert chat_cmd.name == "chat"
+
+    def test_register_extensions_adds_team_chat(self):
+        """register_extensions should add team and chat commands."""
+        from crosscheck.cli_extensions import register_extensions
+        import click
+        cli = click.Group("test")
+        register_extensions(cli)
+        cmd_names = list(cli.commands.keys())
+        assert "team" in cmd_names
+        assert "chat" in cmd_names
+
+    def test_register_extensions_total_commands(self):
+        """register_extensions should add all 8 command groups."""
+        from crosscheck.cli_extensions import register_extensions
+        import click
+        cli = click.Group("test")
+        register_extensions(cli)
+        # pr, sandbox, dashboard, cache, policy, local, team, chat
+        assert len(cli.commands) == 8
+
+    def test_team_cmd_requires_task(self):
+        """team command should require --task option."""
+        from crosscheck.cli_extensions import team_cmd
+        from click.testing import CliRunner
+        runner = CliRunner()
+        result = runner.invoke(team_cmd, [])
+        assert result.exit_code != 0
+        assert "Missing option" in result.output or "required" in result.output.lower()
+
+    def test_team_cmd_requires_api_key(self):
+        """team command should fail without API key."""
+        from crosscheck.cli_extensions import team_cmd
+        from click.testing import CliRunner
+        runner = CliRunner(env={"CROSSCHECK_API_KEY": ""})
+        result = runner.invoke(team_cmd, ["-t", "test task"])
+        assert result.exit_code != 0

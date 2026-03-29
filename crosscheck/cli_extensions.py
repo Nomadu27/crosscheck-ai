@@ -353,9 +353,136 @@ def local_review(file, read_stdin, supervisor, analyzer, coder, ollama_url, max_
 # Helper: register all extensions with the main CLI group
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# AI Dev Team commands (v2.0.0)
+# ---------------------------------------------------------------------------
+
+@click.command("team")
+@click.option("--task", "-t", required=True, help="Task description for the team")
+@click.option("--file", "-f", "code_file", default=None, type=click.Path(exists=True),
+              help="Code file to work on")
+@click.option("--models", default=None,
+              help="Override model assignments (role:model,...) e.g. coder:openai/gpt-5")
+@click.option("--rounds", default=3, type=int, help="Max iteration rounds")
+@click.option("--api-key", default=None, envvar="CROSSCHECK_API_KEY")
+@click.option("--output", default="terminal", type=click.Choice(["terminal", "json", "transcript"]))
+def team_cmd(task, code_file, models, rounds, api_key, output):
+    """Launch an AI Dev Team session in the terminal.
+
+    Example: crosscheck team -t "Add authentication" -f app.py
+    """
+    from crosscheck.client import OpenRouterClient
+    from crosscheck.team import TeamSession, TeamRole, build_team
+
+    if not api_key:
+        err_console.print("No CROSSCHECK_API_KEY found.")
+        sys.exit(1)
+
+    code = ""
+    if code_file:
+        code = Path(code_file).read_text(encoding="utf-8", errors="replace")
+
+    # Parse model overrides
+    team = None
+    if models:
+        overrides = {}
+        for pair in models.split(","):
+            role_str, model_id = pair.strip().split(":", 1)
+            try:
+                role = TeamRole(role_str.strip().lower())
+                overrides[role] = model_id.strip()
+            except ValueError:
+                err_console.print(f"Unknown role: {role_str}")
+                sys.exit(1)
+        team = build_team(overrides)
+
+    console.print("[bold cyan]crosscheck AI Dev Team[/bold cyan]")
+    console.print(f"  Task: {task}")
+    if code_file:
+        console.print(f"  File: {code_file}")
+    console.print(f"  Rounds: {rounds}")
+    console.print()
+
+    async def run():
+        client = OpenRouterClient(api_key=api_key)
+        session = TeamSession(client=client, team=team, max_rounds=rounds)
+        return await session.run(task=task, code=code)
+
+    history = asyncio.run(run())
+
+    if output == "json":
+        import json as _json
+        data = [m.to_dict() for m in history.messages]
+        console.print(_json.dumps(data, indent=2, default=str))
+    elif output == "transcript":
+        console.print(history.to_transcript())
+    else:
+        # Terminal: Rich-formatted output
+        for msg in history.messages:
+            from crosscheck.team.roles import DEFAULT_TEAM
+            color = "white"
+            for spec in DEFAULT_TEAM:
+                if spec.role.value == msg.role:
+                    color = spec.color
+                    break
+            console.print(
+                f"[bold {color}]{msg.display_name}[/bold {color}] "
+                f"[dim]({msg.phase})[/dim]"
+            )
+            console.print(f"  {msg.content[:500]}")
+            if msg.code_blocks:
+                for cb in msg.code_blocks:
+                    console.print(f"\n  [cyan]{cb.filename}[/cyan]")
+                    console.print(f"  ```{cb.language}")
+                    for line in cb.content.split("\n")[:20]:
+                        console.print(f"  {line}")
+                    console.print("  ```")
+            console.print()
+
+    console.print(
+        f"[bold green]Done.[/bold green] "
+        f"{len(history.messages)} messages, session {history.session_id}"
+    )
+
+
+@click.command("chat")
+@click.option("--port", default=8080, type=int)
+@click.option("--host", default="127.0.0.1")
+@click.option("--api-key", default=None, envvar="CROSSCHECK_API_KEY")
+@click.option("--no-open", is_flag=True, help="Don't open browser automatically")
+def chat_cmd(port, host, api_key, no_open):
+    """Launch the Group Chat web UI.
+
+    Opens a browser with the AI Dev Team dialog panel.
+    Example: crosscheck chat --port 8080
+    """
+    from crosscheck.chat_server import create_chat_app
+    try:
+        import uvicorn
+    except ImportError:
+        err_console.print("uvicorn required: pip install 'crosscheck-ai[dashboard]'")
+        sys.exit(1)
+
+    app = create_chat_app(api_key=api_key)
+    url = f"http://{host}:{port}"
+    console.print(f"[bold cyan]crosscheck AI Dev Team[/bold cyan]  {url}")
+    console.print("[dim]Press Ctrl+C to stop[/dim]")
+
+    if not no_open:
+        import webbrowser
+        import threading
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+
+    uvicorn.run(app, host=host, port=port, log_level="warning")
+
+
+# ---------------------------------------------------------------------------
+# Helper: register all extensions with the main CLI group
+# ---------------------------------------------------------------------------
+
 def register_extensions(cli_group) -> None:
     """
-    Call this from cli.py to attach all Phase 1/2 commands:
+    Call this from cli.py to attach all Phase 1/2/v2 commands:
 
         from crosscheck.cli_extensions import register_extensions
         register_extensions(cli)
@@ -366,3 +493,6 @@ def register_extensions(cli_group) -> None:
     cli_group.add_command(cache_group,    "cache")
     cli_group.add_command(policy_group,   "policy")
     cli_group.add_command(local_group,    "local")
+    # v2.0.0 — AI Dev Team
+    cli_group.add_command(team_cmd,       "team")
+    cli_group.add_command(chat_cmd,       "chat")

@@ -7,7 +7,7 @@ name        = "crosscheck-ai"
 version     = "1.0.0"
 description = "AI Dev Team -- multi-agent coding pipeline where Claude codes and other models advise, debug, review, and plan. Built on OpenRouter."
 readme      = "README.md"
-license     = { text = "Proprietary" }
+license     = "LicenseRef-Proprietary"
 requires-python = ">=3.10"
 authors     = [{ name = "Steddy Nova Srl", email = "info@yuyai.pro" }]
 keywords    = ["ai", "llm", "review", "openrouter", "multi-agent", "code-review", "insaits", "observer"]
