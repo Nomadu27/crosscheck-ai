@@ -17,12 +17,9 @@ Usage:
 from __future__ import annotations
 
 import ast
-import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Language-specific import parsers
@@ -218,7 +215,7 @@ class RepoContextBuilder:
                 return False
         return True
 
-    def _read(self, p: Path) -> Optional[FileEntry]:
+    def _read(self, p: Path) -> FileEntry | None:
         try:
             content = p.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -256,7 +253,7 @@ class RepoContextBuilder:
     def _render(self, target: Path, rel_target: str, entries: list[FileEntry]) -> RepoContext:
         # Build file tree string
         tree_lines = [f"📁 {self.root.name}/"]
-        dirs_seen: set[str] = set()
+        _dirs_seen: set[str] = set()
         for e in entries:
             parts = Path(e.rel_path).parts
             indent = "  " * (len(parts) - 1)

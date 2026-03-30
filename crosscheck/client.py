@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Optional
 
 import httpx
 
@@ -90,9 +89,9 @@ class OpenRouterClient:
         self.site_url         = site_url
         self.total_tokens:    int   = 0
         self.total_cost_usd:  float = 0.0
-        self._http: Optional[httpx.AsyncClient] = None
+        self._http: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "OpenRouterClient":
+    async def __aenter__(self) -> OpenRouterClient:
         self._http = httpx.AsyncClient(timeout=120)
         return self
 

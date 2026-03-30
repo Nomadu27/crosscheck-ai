@@ -14,14 +14,14 @@ Now uses the complete InsAIts SDK:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable
 
 logger = logging.getLogger("crosscheck.monitor")
 
 # ── Try to import full InsAIts SDK ─────────────────────────────────────
 try:
-    from insa_its import insAItsMonitor          # ← Official package name
+    from insa_its import insAItsMonitor  # ← Official package name
     _INSAITS_AVAILABLE = True
 except ImportError:
     _INSAITS_AVAILABLE = False
@@ -51,14 +51,14 @@ class CrosscheckMonitor:
 
     def __init__(
         self,
-        api_key:       Optional[str] = None,
+        api_key:       str | None = None,
         anchor_prompt: str = "",
         enabled:       bool = True,
-        on_anomaly:    Optional[Callable[[AnomalyEvent], None]] = None,
+        on_anomaly:    Callable[[AnomalyEvent], None] | None = None,
     ):
         self.enabled    = enabled and _INSAITS_AVAILABLE
         self.on_anomaly = on_anomaly
-        self._monitor:  Optional[insAItsMonitor] = None
+        self._monitor:  insAItsMonitor | None = None
         self._anchor    = anchor_prompt or "Review content for quality, correctness and security"
         self._history:  list[AnomalyEvent] = []
 

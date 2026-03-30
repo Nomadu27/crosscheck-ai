@@ -33,11 +33,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass
-from typing import Optional
 
 import httpx
-
 
 # ---------------------------------------------------------------------------
 # Local model specs (popular Ollama models)
@@ -136,29 +133,29 @@ class LocalClient:
         self.max_retries  = max_retries
         self.total_tokens: int   = 0
         self.total_cost_usd: float = 0.0
-        self._http: Optional[httpx.AsyncClient] = None
+        self._http: httpx.AsyncClient | None = None
 
     # ── Factory methods ──────────────────────────────────────────────────
 
     @classmethod
-    def for_ollama(cls, host: str = "localhost", port: int = 11434) -> "LocalClient":
+    def for_ollama(cls, host: str = "localhost", port: int = 11434) -> LocalClient:
         return cls(base_url=f"http://{host}:{port}/v1")
 
     @classmethod
-    def for_lm_studio(cls, host: str = "localhost", port: int = 1234) -> "LocalClient":
+    def for_lm_studio(cls, host: str = "localhost", port: int = 1234) -> LocalClient:
         return cls(base_url=f"http://{host}:{port}/v1")
 
     @classmethod
-    def for_vllm(cls, host: str = "localhost", port: int = 8000) -> "LocalClient":
+    def for_vllm(cls, host: str = "localhost", port: int = 8000) -> LocalClient:
         return cls(base_url=f"http://{host}:{port}/v1")
 
     @classmethod
-    def for_custom(cls, base_url: str, api_key: str = "") -> "LocalClient":
+    def for_custom(cls, base_url: str, api_key: str = "") -> LocalClient:
         return cls(base_url=base_url, api_key=api_key)
 
     # ── Context manager ──────────────────────────────────────────────────
 
-    async def __aenter__(self) -> "LocalClient":
+    async def __aenter__(self) -> LocalClient:
         self._http = httpx.AsyncClient(timeout=self.timeout)
         return self
 
@@ -245,16 +242,16 @@ class LocalMultiAgentSession:
 
     def __init__(
         self,
-        supervisors:   Optional[list[str]] = None,
-        analyzers:     Optional[list[str]] = None,
-        coder:         Optional[str]       = None,
+        supervisors:   list[str] | None = None,
+        analyzers:     list[str] | None = None,
+        coder:         str | None       = None,
         ollama_url:    str                 = "http://localhost:11434/v1",
         max_rounds:    int                 = 5,
         **kwargs,
     ):
-        from crosscheck.models import Task, Mode, MODE_PRESETS
+        from crosscheck.models import MODE_PRESETS, Mode
 
-        preset = MODE_PRESETS[Mode.BALANCED]
+        _preset = MODE_PRESETS[Mode.BALANCED]
         self._supervisor_models = supervisors or OLLAMA_RECOMMENDED["supervisor"][:1]
         self._analyzer_models   = analyzers   or OLLAMA_RECOMMENDED["analyzer"][:3]
         self._coder_model       = coder       or OLLAMA_RECOMMENDED["coder"][0]
@@ -263,13 +260,13 @@ class LocalMultiAgentSession:
         self._kwargs            = kwargs
 
     async def run_async(self, content: str):
-        from crosscheck.agents.analyzer   import AnalyzerPool
-        from crosscheck.agents.coder      import CoderAgent
-        from crosscheck.agents.supervisor import SupervisorAgent
-        from crosscheck.core              import MultiAgentSession, SessionResult
-        from crosscheck.models            import Task, Mode
-        from crosscheck.monitor           import NoOpMonitor
         import time
+
+        from crosscheck.agents.analyzer import AnalyzerPool
+        from crosscheck.agents.coder import CoderAgent
+        from crosscheck.agents.supervisor import SupervisorAgent
+        from crosscheck.core import SessionResult
+        from crosscheck.models import Task
 
         async with LocalClient(base_url=self._ollama_url) as client:
             # Patch: wire LocalClient into agents directly

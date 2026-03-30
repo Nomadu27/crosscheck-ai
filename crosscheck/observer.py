@@ -26,18 +26,16 @@ InsAIts monitors every supervisor↔analyzer message in observer mode too.
 from __future__ import annotations
 
 import asyncio
-import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
-from crosscheck.agents.analyzer   import AnalyzerPool, AnalyzerReport
+from crosscheck.agents.analyzer import AnalyzerPool, AnalyzerReport
 from crosscheck.agents.supervisor import SupervisorAgent, SynthesisResult
-from crosscheck.client            import OpenRouterClient
-from crosscheck.models            import Mode, Task, OBSERVER_DEFAULT_SUPERVISORS, MODE_PRESETS
-from crosscheck.monitor           import CrosscheckMonitor, NoOpMonitor, AnomalyEvent
-
+from crosscheck.client import OpenRouterClient
+from crosscheck.models import MODE_PRESETS, OBSERVER_DEFAULT_SUPERVISORS, Mode, Task
+from crosscheck.monitor import AnomalyEvent, CrosscheckMonitor, NoOpMonitor
 
 # ── Flag types ────────────────────────────────────────────────────────────────
 
@@ -101,14 +99,14 @@ class ObserverSession:
     def __init__(
         self,
         api_key:      str,
-        supervisors:  Optional[list[str]] = None,
-        analyzers:    Optional[list[str]] = None,
+        supervisors:  list[str] | None = None,
+        analyzers:    list[str] | None = None,
         mode:         Mode                = Mode.BALANCED,
         plan:         str                 = "",
         monitor:      bool                = False,
-        insaits_api_key: Optional[str]    = None,
-        on_flag:      Optional[Callable[[ObserverFlag], None]] = None,
-        on_anomaly:   Optional[Callable[[AnomalyEvent], None]] = None,
+        insaits_api_key: str | None    = None,
+        on_flag:      Callable[[ObserverFlag], None] | None = None,
+        on_anomaly:   Callable[[AnomalyEvent], None] | None = None,
     ):
         self.api_key    = api_key
         self.plan       = plan       # optional spec/plan to check drift against
@@ -288,8 +286,8 @@ class FolderWatcher:
         self,
         session:    ObserverSession,
         path:       str               = ".",
-        extensions: Optional[set[str]] = None,
-        on_result:  Optional[Callable[[ObserverResult], None]] = None,
+        extensions: set[str] | None = None,
+        on_result:  Callable[[ObserverResult], None] | None = None,
         debounce_s: float             = 0.5,
     ):
         self.session    = session
@@ -304,12 +302,11 @@ class FolderWatcher:
         """Start watching. Blocks until KeyboardInterrupt."""
         try:
             from watchdog.observers import Observer
-            from watchdog.events    import FileSystemEventHandler
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "watchdog is required for --watch mode.\n"
                 "Install: pip install watchdog"
-            )
+            ) from err
 
         handler = self._make_handler()
         self._observer = Observer()

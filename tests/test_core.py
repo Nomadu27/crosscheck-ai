@@ -5,11 +5,11 @@ Unit tests for MultiAgentSession with mocked OpenRouter calls.
 """
 
 import json
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from crosscheck import MultiAgentSession, Task, Mode, SessionResult
-
+from crosscheck import Mode, MultiAgentSession, SessionResult, Task
 
 MOCK_DECOMPOSE = json.dumps({
     "session_goal": "Review the code for correctness",

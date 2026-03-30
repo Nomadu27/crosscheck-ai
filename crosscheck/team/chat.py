@@ -17,7 +17,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 
 
 class SessionPhase(Enum):
@@ -54,7 +53,7 @@ class TeamMessage:
     round_num: int = 0
     code_blocks: list[CodeBlock] = field(default_factory=list)
     is_code_output: bool = False
-    target: Optional[str] = None  # "@debugger" if directed
+    target: str | None = None  # "@debugger" if directed
 
     def to_dict(self) -> dict:
         """Serialize for WebSocket/JSON transport."""

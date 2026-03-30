@@ -28,15 +28,13 @@ should be added to the main cli.py cli group.
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
+from rich import box
 from rich.console import Console
-from rich.table   import Table
-from rich         import box
+from rich.table import Table
 
 console     = Console()
 err_console = Console(stderr=True, style="red")
@@ -191,7 +189,7 @@ def sandbox_cmd(path, tools, parallel, list_only):
 @click.option("--db",   default=None, type=click.Path())
 def dashboard_cmd(port, host, db):
     """Launch the team history/cost dashboard."""
-    from crosscheck.dashboard import create_dashboard_app, DEFAULT_DB_PATH
+    from crosscheck.dashboard import DEFAULT_DB_PATH, create_dashboard_app
     try:
         import uvicorn
     except ImportError:
@@ -245,7 +243,7 @@ def policy_group():
 @policy_group.command("list")
 @click.option("--dir", "policy_dir", default="policies", type=click.Path())
 def policy_list(policy_dir):
-    from crosscheck.policy import PolicyLoader, BUILTIN_POLICIES
+    from crosscheck.policy import BUILTIN_POLICIES, PolicyLoader
 
     console.print("[bold]Built-in policies:[/bold]")
     for name in BUILTIN_POLICIES:
@@ -320,7 +318,7 @@ def local_list_models(url):
 @click.option("--output",       default="terminal", type=click.Choice(["terminal", "json", "markdown"]))
 def local_review(file, read_stdin, supervisor, analyzer, coder, ollama_url, max_rounds, output):
     """Review code using local Ollama models (no API key required)."""
-    from crosscheck.local    import LocalMultiAgentSession
+    from crosscheck.local import LocalMultiAgentSession
     from crosscheck.reporter import print_result, to_json, to_markdown
 
     if read_stdin:
@@ -372,7 +370,7 @@ def team_cmd(task, code_file, models, rounds, api_key, output):
     Example: crosscheck team -t "Add authentication" -f app.py
     """
     from crosscheck.client import OpenRouterClient
-    from crosscheck.team import TeamSession, TeamRole, build_team
+    from crosscheck.team import TeamRole, TeamSession, build_team
 
     if not api_key:
         err_console.print("No CROSSCHECK_API_KEY found.")
@@ -469,8 +467,8 @@ def chat_cmd(port, host, api_key, no_open):
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 
     if not no_open:
-        import webbrowser
         import threading
+        import webbrowser
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
 
     uvicorn.run(app, host=host, port=port, log_level="warning")

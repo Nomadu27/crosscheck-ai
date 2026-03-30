@@ -4,13 +4,19 @@ tests/test_models.py
 Tests for the model registry, presets, and helpers.
 """
 
-import pytest
 from crosscheck.models import (
-    REGISTRY, MODE_PRESETS, TASK_BEST, OBSERVER_DEFAULT_SUPERVISORS,
-    Tier, Task, Mode,
-    get_by_id, get_by_tier, get_by_origin, validate_model_ids,
+    MODE_PRESETS,
+    OBSERVER_DEFAULT_SUPERVISORS,
+    REGISTRY,
+    TASK_BEST,
+    Mode,
+    Task,
+    Tier,
+    get_by_id,
+    get_by_origin,
+    get_by_tier,
+    validate_model_ids,
 )
-
 
 # ── Registry integrity ────────────────────────────────────────────────────────
 
@@ -23,7 +29,7 @@ def test_no_duplicate_model_ids():
 
 def test_all_models_have_required_fields():
     for m in REGISTRY:
-        assert m.model_id,     f"Missing model_id"
+        assert m.model_id,     "Missing model_id"
         assert m.display_name, f"Missing display_name: {m.model_id}"
         assert m.provider,     f"Missing provider: {m.model_id}"
         assert m.tiers,        f"No tiers: {m.model_id}"

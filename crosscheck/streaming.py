@@ -31,18 +31,18 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Callable, Optional
+from typing import Any
 
-from rich.console   import Console
-from rich.layout    import Layout
-from rich.live      import Live
-from rich.panel     import Panel
-from rich.progress  import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
-from rich.table     import Table
-from rich.text      import Text
-from rich           import box
-
+from rich import box
+from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+from rich.text import Text
 
 # ---------------------------------------------------------------------------
 # Event types
@@ -83,12 +83,11 @@ class StreamingSession:
     def __init__(self, api_key: str, **kwargs):
         self._api_key = api_key
         self._kwargs  = kwargs
-        self._queue: asyncio.Queue[Optional[StreamEvent]] = asyncio.Queue()
+        self._queue: asyncio.Queue[StreamEvent | None] = asyncio.Queue()
 
     async def stream(self, content: str) -> AsyncIterator[StreamEvent]:
         """Yield StreamEvents as the session progresses."""
         from crosscheck.core import MultiAgentSession
-        from crosscheck.models import Mode, Task
 
         queue = self._queue
 
@@ -170,15 +169,15 @@ class StreamingReporter:
       - Verdict panel that updates in place
     """
 
-    def __init__(self, max_rounds: int, console: Optional[Console] = None):
+    def __init__(self, max_rounds: int, console: Console | None = None):
         self.max_rounds  = max_rounds
         self.console     = console or Console()
         self._round      = 0
         self._scores: list[tuple[str, float, str]] = []  # (model_short, score, verdict)
         self._verdict    = ""
         self._score      = 0.0
-        self._live:      Optional[Live] = None
-        self._progress:  Optional[Progress] = None
+        self._live:      Live | None = None
+        self._progress:  Progress | None = None
         self._task_id    = None
         self._start_time = time.monotonic()
 
@@ -299,7 +298,7 @@ class StreamingReporter:
 async def stream_review(
     content:    str,
     api_key:    str,
-    on_event:   Optional[Callable[[StreamEvent], None]] = None,
+    on_event:   Callable[[StreamEvent], None] | None = None,
     **kwargs,
 ) -> Any:
     """

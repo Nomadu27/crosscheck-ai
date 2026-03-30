@@ -22,10 +22,8 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -231,7 +229,8 @@ class HistoryStore:
 
     def export_csv(self, days: int = 90) -> str:
         """Export session history as CSV string."""
-        import csv, io
+        import csv
+        import io
         sessions = self.recent_sessions(limit=10_000, days=days)
         if not sessions:
             return ""
@@ -254,12 +253,12 @@ def create_dashboard_app(db_path: Path = DEFAULT_DB_PATH) -> FastAPI:
     """
     try:
         from fastapi import FastAPI
-        from fastapi.responses import HTMLResponse, JSONResponse
-    except ImportError:
+        from fastapi.responses import HTMLResponse
+    except ImportError as err:
         raise ImportError(
             "FastAPI required for dashboard mode.\n"
             "Install: pip install 'crosscheck-ai[dashboard]'"
-        )
+        ) from err
 
     app   = FastAPI(title="crosscheck-ai Dashboard", version="0.2.0")
     store = HistoryStore(db_path)

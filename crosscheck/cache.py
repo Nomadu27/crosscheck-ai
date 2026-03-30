@@ -28,8 +28,10 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from crosscheck.agents.analyzer import AnalyzerPool
 
 # ---------------------------------------------------------------------------
 # Cache store
@@ -104,7 +106,7 @@ class ResultCache:
 
     # ── CRUD ─────────────────────────────────────────────────────────────
 
-    def get(self, key: str) -> Optional[dict]:
+    def get(self, key: str) -> dict | None:
         if not self.enabled:
             return None
         with self._connect() as conn:
@@ -296,7 +298,7 @@ class CachedAnalyzerPool:
 
     def __init__(
         self,
-        pool:  "AnalyzerPool",  # type: ignore[name-defined]
+        pool:  AnalyzerPool,
         cache: ResultCache,
         task:  str = "code",
     ):

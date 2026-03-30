@@ -20,12 +20,12 @@ Observer config:
 from __future__ import annotations
 
 import os
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
-from crosscheck.models import Mode, Task, OBSERVER_DEFAULT_SUPERVISORS
+import tomllib
+
+from crosscheck.models import OBSERVER_DEFAULT_SUPERVISORS, Mode, Task
 
 _DEFAULT_CONFIG_PATHS = [
     Path("crosscheck.toml"),
@@ -107,7 +107,7 @@ class CrosscheckConfig:
         return sup, ana
 
 
-def load_config(config_path: Optional[Path] = None) -> CrosscheckConfig:
+def load_config(config_path: Path | None = None) -> CrosscheckConfig:
     """Load config from TOML file then overlay environment variables."""
     cfg = CrosscheckConfig()
 

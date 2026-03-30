@@ -16,10 +16,10 @@ Verify IDs against the live API any time:
 
 from __future__ import annotations
 
-import httpx
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+
+import httpx
 
 
 class Tier(str, Enum):
@@ -495,7 +495,7 @@ OBSERVER_DEFAULT_SUPERVISORS = [
 # Helpers
 # ---------------------------------------------------------------------------
 
-def get_by_id(model_id: str) -> Optional[ModelSpec]:
+def get_by_id(model_id: str) -> ModelSpec | None:
     """Return ModelSpec by exact OpenRouter ID, or None."""
     return next((m for m in REGISTRY if m.model_id == model_id), None)
 

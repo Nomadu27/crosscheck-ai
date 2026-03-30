@@ -19,10 +19,9 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
-from typing import Optional
 
-from crosscheck.client  import OpenRouterClient
-from crosscheck.models  import Task
+from crosscheck.client import OpenRouterClient
+from crosscheck.models import Task
 from crosscheck.prompts import (
     SUPERVISOR_SYSTEM,
     supervisor_decompose,
@@ -202,4 +201,4 @@ class SupervisorAgent:
                 raise ValueError(
                     f"Supervisor {context}: JSON parse failed — {e}\n"
                     f"Raw (first 400 chars): {raw[:400]}"
-                )
+                ) from e

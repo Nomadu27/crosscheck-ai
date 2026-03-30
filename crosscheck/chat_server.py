@@ -23,13 +23,14 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import uuid
-from dataclasses import asdict
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 _CHAT_UI_DIR = Path(__file__).parent / "chat_ui"
 
 
-def create_chat_app(api_key: Optional[str] = None) -> "FastAPI":
+def create_chat_app(api_key: str | None = None) -> FastAPI:
     """Create the FastAPI chat application.
 
     Args:
@@ -48,16 +49,15 @@ def create_chat_app(api_key: Optional[str] = None) -> "FastAPI":
     """
     try:
         from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-        from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+        from fastapi.responses import HTMLResponse
         from fastapi.staticfiles import StaticFiles
-    except ImportError:
+    except ImportError as err:
         raise ImportError(
             "FastAPI required for chat mode.\n"
             "Install: pip install 'crosscheck-ai[dashboard]'"
-        )
+        ) from err
 
-    from crosscheck.team.roles import DEFAULT_TEAM, TeamRole, build_team
-    from crosscheck.team.chat import SessionPhase
+    from crosscheck.team.roles import DEFAULT_TEAM
 
     app = FastAPI(title="crosscheck AI Dev Team", version="2.0.0")
 
@@ -203,7 +203,7 @@ def create_chat_app(api_key: Optional[str] = None) -> "FastAPI":
                     target = data.get("target")
                     if content:
                         try:
-                            responses = await team_session.inject_human_message(
+                            _responses = await team_session.inject_human_message(
                                 content=content, target=target,
                             )
                         except Exception as e:

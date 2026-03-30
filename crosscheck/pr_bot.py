@@ -23,19 +23,13 @@ Design:
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
-import json
 import os
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 import httpx
 
-from crosscheck.core    import MultiAgentSession, SessionResult
-from crosscheck.models  import Mode, Task
-from crosscheck.diff    import unified_diff, diff_stats
-
+from crosscheck.core import MultiAgentSession, SessionResult
+from crosscheck.models import Mode, Task
 
 # ---------------------------------------------------------------------------
 # Provider abstraction
@@ -234,8 +228,8 @@ class PRReviewBot:
     def __init__(
         self,
         crosscheck_api_key: str,
-        github_token:       Optional[str] = None,
-        gitlab_token:       Optional[str] = None,
+        github_token:       str | None = None,
+        gitlab_token:       str | None = None,
         gitlab_url:         str           = "https://gitlab.com",
     ):
         self.api_key       = crosscheck_api_key
@@ -349,8 +343,8 @@ class PRReviewBot:
 
         lines += [
             "---",
-            f"*Powered by [crosscheck-ai](https://github.com/Nomadu27/crosscheck-ai) — "
-            f"multi-agent AI code review*",
+            "*Powered by [crosscheck-ai](https://github.com/Nomadu27/crosscheck-ai) — "
+            "multi-agent AI code review*",
         ]
         return "\n".join(lines)
 
@@ -422,14 +416,15 @@ def create_webhook_app(
         uvicorn.run(app, host="0.0.0.0", port=8080)
     """
     try:
-        from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-        import hmac
         import hashlib
-    except ImportError:
+        import hmac
+
+        from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+    except ImportError as err:
         raise ImportError(
             "FastAPI required for webhook mode.\n"
             "Install: pip install 'crosscheck-ai[webhook]'"
-        )
+        ) from err
 
     app = FastAPI(title="crosscheck-ai PR Bot")
     bot = PRReviewBot(crosscheck_api_key=crosscheck_api_key, github_token=github_token)

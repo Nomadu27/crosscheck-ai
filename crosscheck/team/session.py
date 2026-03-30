@@ -20,14 +20,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
 
-from crosscheck.team.roles import TeamRole, RoleSpec, DEFAULT_TEAM, build_team
 from crosscheck.team.chat import (
-    SessionPhase, TeamMessage, ChatHistory, CodeBlock, extract_code_blocks,
+    ChatHistory,
+    CodeBlock,
+    SessionPhase,
+    TeamMessage,
+    extract_code_blocks,
 )
 from crosscheck.team.command_parser import CommandParser
 from crosscheck.team.language import LanguageDetector
+from crosscheck.team.roles import DEFAULT_TEAM, RoleSpec, TeamRole
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +73,7 @@ class TeamSession:
     def __init__(
         self,
         client,
-        team: Optional[list[RoleSpec]] = None,
+        team: list[RoleSpec] | None = None,
         max_rounds: int = 3,
     ):
         self.client = client
@@ -133,7 +137,7 @@ class TeamSession:
         return self.history
 
     async def inject_human_message(
-        self, content: str, target: Optional[str] = None
+        self, content: str, target: str | None = None
     ) -> list[TeamMessage]:
         """User speaks to the team.
 
@@ -326,7 +330,7 @@ class TeamSession:
         messages.append({"role": "user", "content": user_content})
 
         # Emit typing indicator
-        typing_msg = TeamMessage(
+        _typing_msg = TeamMessage(
             role=spec.role.value,
             model_id=spec.default_model,
             display_name=spec.display_name,
@@ -369,7 +373,7 @@ class TeamSession:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _get_spec(self, role: TeamRole) -> Optional[RoleSpec]:
+    def _get_spec(self, role: TeamRole) -> RoleSpec | None:
         """Find spec by role."""
         for spec in self.team:
             if spec.role == role:

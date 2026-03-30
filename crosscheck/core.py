@@ -23,15 +23,15 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Optional
 
-from crosscheck.agents.analyzer   import AnalyzerPool, AnalyzerReport
-from crosscheck.agents.coder      import CoderAgent
+from crosscheck.agents.analyzer import AnalyzerPool, AnalyzerReport
+from crosscheck.agents.coder import CoderAgent
 from crosscheck.agents.supervisor import SupervisorAgent, SynthesisResult
-from crosscheck.client            import OpenRouterClient
-from crosscheck.models            import Mode, Task, MODE_PRESETS, TASK_BEST
-from crosscheck.monitor           import CrosscheckMonitor, NoOpMonitor, AnomalyEvent
+from crosscheck.client import OpenRouterClient
+from crosscheck.models import MODE_PRESETS, TASK_BEST, Mode, Task
+from crosscheck.monitor import AnomalyEvent, CrosscheckMonitor, NoOpMonitor
 
 
 @dataclass
@@ -84,26 +84,26 @@ class MultiAgentSession:
         max_rounds:      int                  = 5,
 
         # Model selection — override mode presets freely
-        supervisors:     Optional[list[str]]  = None,
-        analyzers:       Optional[list[str]]  = None,
-        coder:           Optional[str]        = None,
+        supervisors:     list[str] | None  = None,
+        analyzers:       list[str] | None  = None,
+        coder:           str | None        = None,
 
         # Auto-select task-optimised models instead of mode preset
         auto_models:     bool                 = False,
 
         # InsAIts integration
         monitor:         bool                 = False,
-        insaits_api_key: Optional[str]        = None,
+        insaits_api_key: str | None        = None,
         monitor_anchor:  str                  = "",
 
         # Callbacks (all optional)
-        on_round_start:          Optional[Callable[[int], None]]              = None,
-        on_supervisor_decompose: Optional[Callable[[dict], None]]             = None,
-        on_analyzer_complete:    Optional[Callable[[AnalyzerReport], None]]   = None,
-        on_supervisor_verdict:   Optional[Callable[[SynthesisResult], None]]  = None,
-        on_coder_output:         Optional[Callable[[str], None]]              = None,
-        on_anomaly:              Optional[Callable[[AnomalyEvent], None]]     = None,
-        on_round_complete:       Optional[Callable[[Round], None]]            = None,
+        on_round_start:          Callable[[int], None] | None              = None,
+        on_supervisor_decompose: Callable[[dict], None] | None             = None,
+        on_analyzer_complete:    Callable[[AnalyzerReport], None] | None   = None,
+        on_supervisor_verdict:   Callable[[SynthesisResult], None] | None  = None,
+        on_coder_output:         Callable[[str], None] | None              = None,
+        on_anomaly:              Callable[[AnomalyEvent], None] | None     = None,
+        on_round_complete:       Callable[[Round], None] | None            = None,
     ):
         self.api_key     = api_key
         self.review_type = review_type
@@ -144,7 +144,7 @@ class MultiAgentSession:
         session_start = time.monotonic()
         rounds: list[Round] = []
         current_content = content
-        prior_reports: Optional[list[AnalyzerReport]] = None
+        prior_reports: list[AnalyzerReport] | None = None
         issues_fixed = 0
         final_score  = 0.0
         verdict      = "MAX_ROUNDS_REACHED"

@@ -14,19 +14,18 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from rich.console  import Console
-from rich.panel    import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
-from rich.table    import Table
-from rich.text     import Text
-from rich          import box
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
+from rich.table import Table
+from rich.text import Text
 
-from crosscheck.core    import Round, SessionResult
-from crosscheck.agents  import AnalyzerReport, SynthesisResult
+from crosscheck.core import Round, SessionResult
 from crosscheck.monitor import AnomalyEvent
 
 if TYPE_CHECKING:
-    from crosscheck.observer import ObserverResult, ObserverFlag
+    from crosscheck.observer import ObserverResult
 
 console = Console()
 
@@ -219,7 +218,7 @@ def print_result(result: SessionResult) -> None:
 
 # ── Observer terminal report ──────────────────────────────────────────────────
 
-def print_observer_result(result: "ObserverResult", show_pass: bool = True) -> None:
+def print_observer_result(result: ObserverResult, show_pass: bool = True) -> None:
     """
     Print a compact observer result to the terminal.
     Used by both paste and watch modes.

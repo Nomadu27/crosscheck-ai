@@ -14,8 +14,8 @@ and all critical/major issues, then returns the complete revised content.
 
 from __future__ import annotations
 
-from crosscheck.client  import OpenRouterClient
-from crosscheck.models  import Task
+from crosscheck.client import OpenRouterClient
+from crosscheck.models import Task
 from crosscheck.prompts import CODER_SYSTEM, coder_prompt
 
 

@@ -5,6 +5,7 @@ System + instruction prompts for each agent role and review type.
 """
 
 from __future__ import annotations
+
 from crosscheck.models import Task
 
 # ---------------------------------------------------------------------------

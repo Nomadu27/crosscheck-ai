@@ -5,14 +5,13 @@ Tests for SupervisorAgent: single-supervisor, dual-supervisor voting,
 reconciliation logic, JSON parsing, error handling.
 """
 
-import asyncio
 import json
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from crosscheck.agents.supervisor import SupervisorAgent, SynthesisResult, DecomposeResult
+from crosscheck.agents.supervisor import DecomposeResult, SupervisorAgent, SynthesisResult
 from crosscheck.models import Task
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

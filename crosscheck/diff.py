@@ -16,12 +16,11 @@ from __future__ import annotations
 
 import difflib
 from dataclasses import dataclass
-from typing import Optional
 
+from rich import box
 from rich.console import Console
-from rich.table   import Table
-from rich.text    import Text
-from rich         import box
+from rich.table import Table
+from rich.text import Text
 
 console = Console()
 
@@ -127,7 +126,7 @@ def side_by_side(
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "equal":
             # Show equal lines dim
-            for bl, al in zip(b_lines[i1:i2], a_lines[j1:j2]):
+            for bl, al in zip(b_lines[i1:i2], a_lines[j1:j2], strict=False):
                 table.add_row(
                     Text(bl, style="dim"),
                     Text(al, style="dim"),
@@ -139,7 +138,7 @@ def side_by_side(
             max_len = max(len(b_chunk), len(a_chunk))
             b_chunk += [""] * (max_len - len(b_chunk))
             a_chunk += [""] * (max_len - len(a_chunk))
-            for bl, al in zip(b_chunk, a_chunk):
+            for bl, al in zip(b_chunk, a_chunk, strict=False):
                 table.add_row(
                     Text(bl, style="red"),
                     Text(al, style="green"),

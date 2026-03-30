@@ -26,27 +26,34 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
+from dotenv import load_dotenv
+from rich import box
 from rich.console import Console
-from rich.panel   import Panel
-from rich.table   import Table
-from rich.text    import Text
-from rich         import box
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
-from crosscheck.config   import load_config, example_toml
-from crosscheck.core     import MultiAgentSession
-from crosscheck.models   import (
-    Mode, Task, REGISTRY, Tier,
-    fetch_latest, get_by_tier, validate_model_ids, OBSERVER_DEFAULT_SUPERVISORS,
+from crosscheck.config import example_toml, load_config
+from crosscheck.core import MultiAgentSession
+from crosscheck.models import (
+    REGISTRY,
+    Mode,
+    Task,
+    Tier,
+    fetch_latest,
+    get_by_tier,
+    validate_model_ids,
 )
 from crosscheck.reporter import (
-    LiveReporter, print_result, print_observer_result,
-    to_json, to_markdown,
+    LiveReporter,
+    print_observer_result,
+    print_result,
+    to_json,
+    to_markdown,
 )
 
-from dotenv import load_dotenv
 load_dotenv(override=True)
 
 
@@ -345,7 +352,7 @@ def observe_paste(code, plan, plan_file, sup_models, ana_models,
     hdr_console.print("[bold cyan]crosscheck-ai[/bold cyan]  [dim]observe paste[/dim]")
     hdr_console.print(f"  Supervisors: [dim]{', '.join(s.split('/')[-1] for s in supervisors)}[/dim]")
     if plan_text:
-        hdr_console.print(f"  Plan drift:  [cyan]✓ checking[/cyan]")
+        hdr_console.print("  Plan drift:  [cyan]✓ checking[/cyan]")
     hdr_console.print()
 
     session = ObserverSession(
@@ -407,7 +414,7 @@ def observe_watch(
       crosscheck observe watch . --supervisor x-ai/grok-4 \\
           --supervisor anthropic/claude-opus-4.6 --quiet
     """
-    from crosscheck.observer import ObserverSession, FolderWatcher
+    from crosscheck.observer import FolderWatcher, ObserverSession
 
     cfg = load_config(config)
     if api_key:  cfg.api_key = api_key
@@ -449,8 +456,8 @@ def observe_watch(
     hdr_console.print(f"  Supervisors: [dim]{', '.join(s.split('/')[-1] for s in supervisors)}[/dim]")
     hdr_console.print(f"  Quiet:       [dim]{'yes (flags only)' if quiet else 'no (all results)'}[/dim]")
     if plan_text:
-        hdr_console.print(f"  Plan drift:  [cyan]✓ active[/cyan]")
-    hdr_console.print(f"\n  [dim]Ctrl+C to stop[/dim]\n")
+        hdr_console.print("  Plan drift:  [cyan]✓ active[/cyan]")
+    hdr_console.print("\n  [dim]Ctrl+C to stop[/dim]\n")
 
     session = ObserverSession(
         api_key     = cfg.api_key,
@@ -486,7 +493,7 @@ def observe_watch(
 
 def _run_interactive_wizard(
     review_type: Task,
-) -> Optional[tuple[list[str], list[str], str]]:
+) -> tuple[list[str], list[str], str] | None:
     """
     Full interactive model-selection wizard using questionary.
     Returns (supervisors, analyzers, coder) or None if aborted/TTY unavailable.
@@ -518,7 +525,7 @@ def _run_interactive_wizard(
         ("instruction", "fg:#6c6c6c"),
     ])
 
-    from crosscheck.models import get_by_id, TASK_BEST
+    from crosscheck.models import TASK_BEST
 
     def _label(m) -> str:
         ctx = m.context_k
@@ -779,7 +786,8 @@ def _detect_type(path: Path) -> Task:
 
 
 # ── Register Phase 1/2 extensions ────────────────────────────────────────────
-from crosscheck.cli_extensions import register_extensions
+from crosscheck.cli_extensions import register_extensions  # noqa: E402
+
 register_extensions(cli)
 
 

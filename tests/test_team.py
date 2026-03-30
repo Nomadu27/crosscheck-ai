@@ -7,22 +7,26 @@ Covers: roles, chat messages, command parser, language detection,
 and TeamSession orchestration. All mocked — no API key needed.
 """
 
-import asyncio
-import json
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
 
-from crosscheck.team.roles import (
-    TeamRole, RoleSpec, DEFAULT_TEAM, get_role_spec, build_team,
-)
 from crosscheck.team.chat import (
-    SessionPhase, TeamMessage, CodeBlock, ChatHistory, extract_code_blocks,
+    ChatHistory,
+    CodeBlock,
+    SessionPhase,
+    TeamMessage,
+    extract_code_blocks,
 )
-from crosscheck.team.command_parser import CommandParser, ParseResult
+from crosscheck.team.command_parser import CommandParser
 from crosscheck.team.language import LanguageDetector
-from crosscheck.team.session import TeamSession, ReviewResult
-
+from crosscheck.team.roles import (
+    DEFAULT_TEAM,
+    TeamRole,
+    build_team,
+    get_role_spec,
+)
+from crosscheck.team.session import ReviewResult, TeamSession
 
 # ── Roles ────────────────────────────────────────────────────────────────────
 
@@ -518,7 +522,7 @@ class TestTeamSession:
         client = _mock_client(["Got it, fixing now."])
         session = TeamSession(client=client, max_rounds=1)
 
-        responses = await session.inject_human_message(
+        _responses = await session.inject_human_message(
             "@coder fix the null check"
         )
 
@@ -606,8 +610,9 @@ class TestChatServer:
 
     def test_chat_app_team_endpoint(self):
         """GET /api/team should return team info."""
-        from crosscheck.chat_server import create_chat_app
         from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
         app = create_chat_app(api_key="test-key")
         client = TestClient(app)
         resp = client.get("/api/team")
@@ -621,8 +626,9 @@ class TestChatServer:
 
     def test_chat_app_index_serves_html(self):
         """GET / should return HTML."""
-        from crosscheck.chat_server import create_chat_app
         from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
         app = create_chat_app(api_key="test-key")
         client = TestClient(app)
         resp = client.get("/")
@@ -657,8 +663,9 @@ class TestCLITeamChat:
 
     def test_register_extensions_adds_team_chat(self):
         """register_extensions should add team and chat commands."""
-        from crosscheck.cli_extensions import register_extensions
         import click
+
+        from crosscheck.cli_extensions import register_extensions
         cli = click.Group("test")
         register_extensions(cli)
         cmd_names = list(cli.commands.keys())
@@ -667,8 +674,9 @@ class TestCLITeamChat:
 
     def test_register_extensions_total_commands(self):
         """register_extensions should add all 8 command groups."""
-        from crosscheck.cli_extensions import register_extensions
         import click
+
+        from crosscheck.cli_extensions import register_extensions
         cli = click.Group("test")
         register_extensions(cli)
         # pr, sandbox, dashboard, cache, policy, local, team, chat
@@ -676,8 +684,9 @@ class TestCLITeamChat:
 
     def test_team_cmd_requires_task(self):
         """team command should require --task option."""
-        from crosscheck.cli_extensions import team_cmd
         from click.testing import CliRunner
+
+        from crosscheck.cli_extensions import team_cmd
         runner = CliRunner()
         result = runner.invoke(team_cmd, [])
         assert result.exit_code != 0
@@ -685,8 +694,9 @@ class TestCLITeamChat:
 
     def test_team_cmd_requires_api_key(self):
         """team command should fail without API key."""
-        from crosscheck.cli_extensions import team_cmd
         from click.testing import CliRunner
+
+        from crosscheck.cli_extensions import team_cmd
         runner = CliRunner(env={"CROSSCHECK_API_KEY": ""})
         result = runner.invoke(team_cmd, ["-t", "test task"])
         assert result.exit_code != 0

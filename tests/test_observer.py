@@ -5,21 +5,21 @@ Tests for ObserverSession, FolderWatcher, flag classification,
 dual-supervisor integration in observer mode, and CLI observe commands.
 """
 
-import asyncio
-import json
-import time
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
-from crosscheck.observer import (
-    ObserverSession, ObserverResult, ObserverFlag,
-    FolderWatcher, FLAG_ICONS, FLAG_COLORS,
-)
+from crosscheck.agents.analyzer import AnalyzerReport
 from crosscheck.agents.supervisor import SynthesisResult
-from crosscheck.agents.analyzer   import AnalyzerReport
 from crosscheck.models import Mode
-
+from crosscheck.observer import (
+    FLAG_COLORS,
+    FLAG_ICONS,
+    FolderWatcher,
+    ObserverFlag,
+    ObserverResult,
+    ObserverSession,
+)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -281,7 +281,7 @@ async def test_observer_check_fires_on_flag_callback():
             api_key = "sk-test",
             on_flag = lambda f: received.append(f),
         )
-        result = await session.check("def foo(): x = 1/0")
+        _result = await session.check("def foo(): x = 1/0")
 
     assert len(received) >= 1
     assert all(isinstance(f, ObserverFlag) for f in received)
@@ -422,6 +422,7 @@ def test_all_flag_types_have_icons():
 
 def test_observe_paste_no_api_key():
     from click.testing import CliRunner
+
     from crosscheck.cli import cli
     runner = CliRunner()
     r = runner.invoke(
@@ -434,6 +435,7 @@ def test_observe_paste_no_api_key():
 def test_observe_paste_no_code_no_stdin():
     """Without --code and without stdin, should give a UsageError."""
     from click.testing import CliRunner
+
     from crosscheck.cli import cli
     runner = CliRunner()
     r = runner.invoke(
@@ -447,8 +449,9 @@ def test_observe_paste_no_code_no_stdin():
 def test_observe_paste_with_mocked_session(tmp_path):
     """observe paste should call ObserverSession.check and print result."""
     from click.testing import CliRunner
+
     from crosscheck.cli import cli
-    from crosscheck.observer import ObserverResult, ObserverFlag
+    from crosscheck.observer import ObserverResult
 
     fake = ObserverResult(
         passed=True, flags=[], score=9.5, summary="All good",
@@ -467,6 +470,7 @@ def test_observe_paste_with_mocked_session(tmp_path):
 
 def test_observe_watch_no_api_key():
     from click.testing import CliRunner
+
     from crosscheck.cli import cli
     runner = CliRunner()
     r = runner.invoke(
@@ -478,6 +482,7 @@ def test_observe_watch_no_api_key():
 
 def test_observe_watch_invalid_path():
     from click.testing import CliRunner
+
     from crosscheck.cli import cli
     runner = CliRunner()
     r = runner.invoke(
@@ -490,6 +495,7 @@ def test_observe_watch_invalid_path():
 def test_observe_paste_plan_file(tmp_path):
     """--plan-file should be read and passed to ObserverSession."""
     from click.testing import CliRunner
+
     from crosscheck.cli import cli
     from crosscheck.observer import ObserverResult
 

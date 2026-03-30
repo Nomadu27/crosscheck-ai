@@ -26,13 +26,9 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import os
 import shutil
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Data
@@ -173,14 +169,14 @@ class ExecutionSandbox:
     def __init__(
         self,
         project_root: str | Path = ".",
-        timeout_override: Optional[int] = None,
+        timeout_override: int | None = None,
     ):
         self.root             = Path(project_root).resolve()
         self.timeout_override = timeout_override
 
     # ── Discovery ────────────────────────────────────────────────────────
 
-    def available_tools(self, target_extensions: Optional[list[str]] = None) -> list[str]:
+    def available_tools(self, target_extensions: list[str] | None = None) -> list[str]:
         """
         Return names of tools that are installed and applicable to this project.
         Filters by target_extensions if provided (e.g. ['.py', '.ts']).
@@ -266,7 +262,7 @@ class ExecutionSandbox:
 
     async def run_all(
         self,
-        tools: Optional[list[str]] = None,
+        tools: list[str] | None = None,
         parallel: bool = True,
     ) -> list[ToolResult]:
         """

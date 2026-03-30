@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 
-
 # ---------------------------------------------------------------------------
 # Language detection patterns — ported 1:1 from LanguageDetector.kt
 # Order matters: more specific patterns first (Romanian before French, etc.)

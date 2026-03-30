@@ -11,13 +11,10 @@ Tests for ObserverSession, FolderWatcher, and new Phase 1/2 modules:
   - streaming (StreamingSession events)
 """
 
-import asyncio
 import json
-import pytest
-import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 
 # ── Observer core ──────────────────────────────────────────────────────────────
 
@@ -194,8 +191,9 @@ class TestDiff:
         assert "addition" in s.summary() or "change" in s.summary()
 
     def test_side_by_side_returns_table(self):
-        from crosscheck.diff import side_by_side
         from rich.table import Table
+
+        from crosscheck.diff import side_by_side
         t = side_by_side("old\n", "new\n")
         assert isinstance(t, Table)
 
@@ -438,7 +436,7 @@ class TestLocalClient:
     async def test_local_client_routes_to_local_endpoint(self):
         from crosscheck.local import LocalClient
 
-        responses = []
+        _responses = []
         async def _mock_post(*args, **kwargs):
             resp = MagicMock()
             resp.status_code = 200
@@ -488,8 +486,8 @@ class TestStreamingSession:
 
     @pytest.mark.asyncio
     async def test_streaming_emits_events(self):
+        from crosscheck.core import SessionResult
         from crosscheck.streaming import StreamingSession
-        from crosscheck.core      import SessionResult
 
         fake_result = MagicMock(spec=SessionResult)
         fake_result.verdict       = "APPROVED"
@@ -525,7 +523,7 @@ class TestStreamingSession:
         assert reporter.max_rounds == 3
 
     def test_streaming_reporter_on_event_no_crash(self):
-        from crosscheck.streaming import StreamingReporter, StreamEvent
+        from crosscheck.streaming import StreamEvent, StreamingReporter
         reporter = StreamingReporter(max_rounds=3)
         event    = StreamEvent(kind="round_start", round_num=1)
         # Should not crash even without Live context
@@ -538,9 +536,9 @@ class TestGitHubProvider:
 
     @pytest.mark.asyncio
     async def test_format_summary_approved(self):
+        from crosscheck.agents import AnalyzerReport, SynthesisResult
+        from crosscheck.core import Round, SessionResult
         from crosscheck.pr_bot import PRReviewBot, PRReviewConfig
-        from crosscheck.core   import SessionResult, Round
-        from crosscheck.agents import SynthesisResult, AnalyzerReport
 
         synthesis = SynthesisResult(
             verdict="APPROVED", overall_score=9.0, summary="Looks great",
@@ -567,9 +565,9 @@ class TestGitHubProvider:
 
     @pytest.mark.asyncio
     async def test_format_summary_revise_shows_issues(self):
+        from crosscheck.agents import AnalyzerReport, SynthesisResult
+        from crosscheck.core import Round, SessionResult
         from crosscheck.pr_bot import PRReviewBot, PRReviewConfig
-        from crosscheck.core   import SessionResult, Round
-        from crosscheck.agents import SynthesisResult, AnalyzerReport
 
         synthesis = SynthesisResult(
             verdict="REVISE", overall_score=4.0, summary="Needs work",

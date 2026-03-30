@@ -5,15 +5,14 @@ Tests for CLI commands: review, models, profiles, types, init.
 """
 
 import json
-import pytest
 from pathlib import Path
+from unittest.mock import patch
+
 from click.testing import CliRunner
-from unittest.mock import patch, MagicMock
 
-from crosscheck.cli  import cli
-from crosscheck.core import SessionResult, Round
 from crosscheck.agents import AnalyzerReport, SynthesisResult
-
+from crosscheck.cli import cli
+from crosscheck.core import Round, SessionResult
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -244,7 +243,7 @@ def test_review_interactive_non_tty(tmp_path):
     # The CliRunner does not provide a real TTY so the wizard should abort
     assert r.exit_code in (0, 1)
     # Should mention TTY or wizard in output/error
-    combined = (r.output or "") + (r.exception.__str__() if r.exception else "")
+    _combined = (r.output or "") + (r.exception.__str__() if r.exception else "")
     # We just verify it didn't silently crash with an unhandled exception
     assert not isinstance(r.exception, KeyError), f"Unhandled exception: {r.exception}"
 

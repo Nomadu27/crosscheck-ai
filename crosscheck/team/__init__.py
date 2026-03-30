@@ -7,13 +7,16 @@ and other models advise, debug, review, and plan.
 v2.0.0 — The real deal.
 """
 
-from crosscheck.team.roles import TeamRole, RoleSpec, DEFAULT_TEAM
 from crosscheck.team.chat import (
-    TeamMessage, CodeBlock, ChatHistory, SessionPhase,
+    ChatHistory,
+    CodeBlock,
+    SessionPhase,
+    TeamMessage,
 )
-from crosscheck.team.session import TeamSession
 from crosscheck.team.command_parser import CommandParser, ParseResult
 from crosscheck.team.language import LanguageDetector
+from crosscheck.team.roles import DEFAULT_TEAM, RoleSpec, TeamRole
+from crosscheck.team.session import TeamSession
 
 __all__ = [
     "TeamRole",

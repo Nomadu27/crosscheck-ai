@@ -14,9 +14,8 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
-from typing import Optional
 
-from crosscheck.client  import OpenRouterClient
+from crosscheck.client import OpenRouterClient
 from crosscheck.prompts import ANALYZER_SYSTEM, analyzer_prompt
 
 
@@ -30,7 +29,7 @@ class AnalyzerReport:
     positive_findings: list[str]
     summary:           str
     raw:               dict = field(default_factory=dict)
-    error:             Optional[str] = None
+    error:             str | None = None
 
 
 class AnalyzerPool:
@@ -51,7 +50,7 @@ class AnalyzerPool:
         content:       str,
         tasks:         list[dict],        # from Supervisor.decompose()
         round_num:     int,
-        prior_reports: Optional[list[AnalyzerReport]] = None,
+        prior_reports: list[AnalyzerReport] | None = None,
     ) -> list[AnalyzerReport]:
         """
         Run all analyzers in parallel.
@@ -153,4 +152,4 @@ class AnalyzerPool:
                 raise ValueError(
                     f"Analyzer {model}: JSON parse failed — {e}\n"
                     f"Raw (first 300 chars): {raw[:300]}"
-                )
+                ) from e
