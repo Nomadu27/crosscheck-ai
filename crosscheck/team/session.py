@@ -286,10 +286,16 @@ class TeamSession:
         Call this concurrently with run() to get real-time updates.
         """
         while True:
-            msg = await self._message_queue.get()
-            yield msg
-            if self.phase == SessionPhase.DONE:
-                break
+            try:
+                msg = await asyncio.wait_for(
+                    self._message_queue.get(), timeout=1.0,
+                )
+                yield msg
+            except asyncio.TimeoutError:
+                # Check if session is done and queue is empty
+                if self.phase == SessionPhase.DONE and self._message_queue.empty():
+                    break
+                continue
 
     # ------------------------------------------------------------------
     # Phase runners

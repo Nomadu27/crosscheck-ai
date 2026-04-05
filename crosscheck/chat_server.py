@@ -332,8 +332,14 @@ def create_chat_app(api_key: str | None = None) -> "FastAPI":
                                 try:
                                     phase_val = msg.phase.value if hasattr(msg.phase, "value") else str(msg.phase)
 
+                                    # Sanitize content for JSON safety (free models
+                                    # may produce characters that break serialization)
+                                    safe_content = (msg.content or "").encode(
+                                        "utf-8", errors="replace"
+                                    ).decode("utf-8")
+
                                     # Check if this is a proposal message
-                                    if msg.role == "system" and msg.code_blocks and "proposal" in msg.content.lower():
+                                    if msg.role == "system" and msg.code_blocks and "proposal" in safe_content.lower():
                                         proposal = ts._current_proposal
                                         await ws.send_json({
                                             "type": "change_proposal",
@@ -360,14 +366,14 @@ def create_chat_app(api_key: str | None = None) -> "FastAPI":
                                     if msg.role == "system" and msg.display_name == "Safety Tools":
                                         await ws.send_json({
                                             "type": "test_results",
-                                            "content": msg.content,
-                                            "passed": "passed" in msg.content.lower() and "failed" not in msg.content.lower(),
+                                            "content": safe_content,
+                                            "passed": "passed" in safe_content.lower() and "failed" not in safe_content.lower(),
                                             "session_id": sid,
                                         })
                                         continue
 
                                     # Phase change notification
-                                    if msg.role == "system" and msg.content.startswith("Phase:"):
+                                    if msg.role == "system" and safe_content.startswith("Phase:"):
                                         await ws.send_json({
                                             "type": "phase_change",
                                             "phase": phase_val,
@@ -379,26 +385,33 @@ def create_chat_app(api_key: str | None = None) -> "FastAPI":
                                     await ws.send_json({
                                         "type": "agent_message",
                                         "role": msg.role,
-                                        "model_id": msg.model_id,
-                                        "display_name": msg.display_name,
-                                        "content": msg.content,
+                                        "model_id": msg.model_id or "",
+                                        "display_name": msg.display_name or msg.role,
+                                        "content": safe_content,
                                         "phase": phase_val,
                                         "round_num": msg.round_num,
                                         "code_blocks": [
                                             {
-                                                "filename": cb.filename,
-                                                "language": cb.language,
-                                                "content": cb.content,
-                                                "action": cb.action,
+                                                "filename": cb.filename or "",
+                                                "language": cb.language or "",
+                                                "content": (cb.content or ""),
+                                                "action": cb.action or "create",
                                             }
-                                            for cb in msg.code_blocks
+                                            for cb in (msg.code_blocks or [])
                                         ],
-                                        "is_code_output": msg.is_code_output,
-                                        "timestamp": msg.timestamp,
+                                        "is_code_output": bool(msg.is_code_output),
+                                        "timestamp": msg.timestamp or "",
                                         "session_id": sid,
                                     })
-                                except Exception:
+                                except WebSocketDisconnect:
+                                    logger.info("Client disconnected during stream")
                                     break
+                                except Exception as e:
+                                    logger.error(
+                                        "Stream error for %s: %s — skipping message",
+                                        msg.role, e,
+                                    )
+                                    continue
 
                         stream_task = asyncio.create_task(
                             stream_messages(team_session, websocket, session_id)
