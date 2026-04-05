@@ -20,12 +20,19 @@ from enum import Enum
 
 
 class SessionPhase(Enum):
-    """Phases of a TeamSession."""
+    """Phases of a TeamSession.
+
+    Flow: PLANNING → DISCUSSION → CODING → REVIEW → DISSENT → APPROVAL → TESTING → DONE
+    If rejected or tests fail, loops back to DISCUSSION/CODING.
+    """
 
     PLANNING = "planning"
     DISCUSSION = "discussion"
     CODING = "coding"
     REVIEW = "review"
+    DISSENT = "dissent"          # Observers + Debugger stress-test consensus
+    APPROVAL = "approval"        # Waiting for human Accept/Reject/Edit
+    TESTING = "testing"          # Auto-run safety tools after apply
     HUMAN_INPUT = "human_input"
     DONE = "done"
 

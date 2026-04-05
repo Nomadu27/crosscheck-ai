@@ -59,6 +59,10 @@ _COST_PER_1K: dict[str, float] = {
     "moonshotai/kimi-k2.5":               0.005,
     "moonshotai/kimi-k2":                  0.004,
     "moonshotai/kimi-k2-thinking":         0.005,
+    # Free models
+    "qwen/qwen3-coder:free":              0.000,
+    "nousresearch/hermes-3-llama-3.1-405b:free": 0.000,
+    "meta-llama/llama-3.3-70b-instruct:free":    0.000,
 }
 
 _RETRY_CODES   = {429, 500, 502, 503}
@@ -99,6 +103,11 @@ class OpenRouterClient:
         if self._http:
             await self._http.aclose()
 
+    async def ensure_http(self) -> None:
+        """Ensure the HTTP client is initialized (for use without context manager)."""
+        if self._http is None:
+            self._http = httpx.AsyncClient(timeout=120)
+
     def _headers(self) -> dict:
         return {
             "Authorization": f"Bearer {self.api_key}",
@@ -126,8 +135,8 @@ class OpenRouterClient:
         Retries on transient errors (429, 5xx, network failures).
         Raises OpenRouterError on permanent failures.
         """
-        assert self._http is not None, \
-            "OpenRouterClient must be used inside 'async with' block."
+        if self._http is None:
+            await self.ensure_http()
 
         body: dict = {
             "model":       model,

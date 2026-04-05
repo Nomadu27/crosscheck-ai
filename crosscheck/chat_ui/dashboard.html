@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crosscheck AI Dev Team — Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body data-theme="dark">
+
+<!-- Header -->
+<div class="header">
+  <h1>crosscheck</h1>
+  <span class="badge">AI Dev Team</span>
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="setup">Setup</button>
+    <button class="tab-btn" data-tab="team">Team</button>
+    <button class="tab-btn" data-tab="chat">Chat</button>
+    <button class="tab-btn" data-tab="review">Review</button>
+    <button class="tab-btn" data-tab="history">History</button>
+  </div>
+  <span id="conn-status" class="status disconnected">Ready</span>
+  <button class="theme-toggle" onclick="toggleTheme()">Theme</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: SETUP -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-setup">
+  <div class="setup-container">
+    <div class="setup-section">
+      <h2>API Key</h2>
+      <p>Enter your OpenRouter API key. Get one at <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--accent)">openrouter.ai/keys</a></p>
+      <div class="input-row">
+        <input type="password" id="api-key-input" placeholder="sk-or-v1-..." class="text-input wide">
+        <button class="btn" onclick="saveApiKey()">Save</button>
+        <button class="btn btn-secondary" onclick="testApiKey()">Test</button>
+      </div>
+      <div id="api-key-status" class="status-msg"></div>
+    </div>
+
+    <div class="setup-section">
+      <h2>Configuration</h2>
+      <div class="config-grid">
+        <div class="config-item">
+          <label>Max Rounds</label>
+          <select id="cfg-max-rounds">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3 (default)</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div class="config-item">
+          <label>Mode</label>
+          <select id="cfg-mode">
+            <option value="fast">Fast</option>
+            <option value="balanced" selected>Balanced</option>
+            <option value="quality">Quality</option>
+          </select>
+        </div>
+        <div class="config-item">
+          <label>Output</label>
+          <select id="cfg-output">
+            <option value="terminal" selected>Terminal</option>
+            <option value="json">JSON</option>
+            <option value="markdown">Markdown</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-section">
+      <h2>Quick Commands</h2>
+      <p>Copy these to run from terminal:</p>
+      <div class="cmd-list">
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck team -t "Add authentication" -f app.py</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck review mycode.py --mode balanced</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck observe watch ./src</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck chat --port 8080</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck sandbox . --tools ruff,pytest</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck pr review --repo owner/repo --pr 42</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck models list</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+        <div class="cmd-item" onclick="copyCmd(this)">
+          <code>crosscheck dashboard --port 8080</code>
+          <span class="copy-hint">click to copy</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: TEAM -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-team">
+  <div class="team-config-container">
+    <h2>AI Dev Team Configuration</h2>
+    <p>Assign models to each role. Click a role to change its model.</p>
+    <div class="team-grid" id="team-config-grid">
+      <!-- Filled by JS -->
+    </div>
+
+    <div class="model-registry-section">
+      <h2>Model Registry <span class="badge" id="model-count">31 models</span></h2>
+      <div class="model-filters">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="supervisor">Supervisors</button>
+        <button class="filter-btn" data-filter="analyzer">Analyzers</button>
+        <button class="filter-btn" data-filter="coder">Coders</button>
+        <button class="filter-btn" data-filter="western">Western</button>
+        <button class="filter-btn" data-filter="chinese">Chinese</button>
+      </div>
+      <div class="model-table-wrap">
+        <table class="model-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Provider</th>
+              <th>Tiers</th>
+              <th>Context</th>
+              <th>Origin</th>
+            </tr>
+          </thead>
+          <tbody id="model-registry-body">
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: CHAT (Group Chat) -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-chat">
+  <div class="main" id="chat-main">
+    <!-- Task input screen (shown first) -->
+    <div id="task-screen" class="task-screen-visible">
+      <div class="task-input">
+        <h2>Start a Team Session</h2>
+        <p>Describe the task. Claude codes while GPT-5, DeepSeek, Grok, and Gemini advise.</p>
+        <textarea id="task-textarea" placeholder="e.g. Add authentication to app.py with JWT tokens..." rows="4"></textarea>
+        <div class="task-options">
+          <label>Code file (optional):</label>
+          <textarea id="code-textarea" placeholder="Paste code here or leave empty..." rows="3" class="code-input"></textarea>
+        </div>
+        <button onclick="startTask()">Launch Team</button>
+      </div>
+    </div>
+
+    <!-- Chat screen (shown after task starts — hidden by default) -->
+    <div id="chat-screen" class="chat-screen-layout chat-screen-hidden">
+      <!-- Phase sidebar -->
+      <div class="phase-sidebar">
+        <h3>Phases</h3>
+        <div class="phase-item" id="phase-planning"><div class="phase-dot"></div><span>Planning</span></div>
+        <div class="phase-item" id="phase-discussion"><div class="phase-dot"></div><span>Discussion</span></div>
+        <div class="phase-item" id="phase-coding"><div class="phase-dot"></div><span>Coding</span></div>
+        <div class="phase-item" id="phase-review"><div class="phase-dot"></div><span>Review</span></div>
+        <div class="phase-item" id="phase-dissent"><div class="phase-dot"></div><span>Dissent</span></div>
+        <div class="phase-item" id="phase-approval"><div class="phase-dot"></div><span>Approval</span></div>
+        <div class="phase-item" id="phase-testing"><div class="phase-dot"></div><span>Testing</span></div>
+        <div class="phase-item" id="phase-done"><div class="phase-dot"></div><span>Done</span></div>
+      </div>
+
+      <!-- Chat area -->
+      <div class="chat-area">
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="input-bar" style="position:relative">
+          <div id="mention-dropdown" class="mention-dropdown"></div>
+          <textarea id="chat-input" placeholder="Talk to the team... @role to mention" rows="1" oninput="autoResize(this)"></textarea>
+          <button onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+
+      <!-- Team panel -->
+      <div class="team-panel">
+        <h3>Team</h3>
+        <div id="team-list"></div>
+        <div style="margin-top:12px">
+          <button class="btn btn-secondary btn-sm" onclick="exportTranscript()">Export</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: REVIEW -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-review">
+  <div class="review-container">
+    <h2>Code Review</h2>
+    <p>Submit code for multi-agent review. Dual supervisors vote independently.</p>
+    <div class="review-form">
+      <div class="review-options">
+        <div class="config-item">
+          <label>Review Type</label>
+          <select id="review-type">
+            <option value="code">Code</option>
+            <option value="plan">Plan</option>
+            <option value="text">Text</option>
+          </select>
+        </div>
+        <div class="config-item">
+          <label>Mode</label>
+          <select id="review-mode">
+            <option value="fast">Fast</option>
+            <option value="balanced" selected>Balanced</option>
+            <option value="quality">Quality</option>
+          </select>
+        </div>
+        <div class="config-item">
+          <label>Max Rounds</label>
+          <select id="review-rounds">
+            <option value="1">1</option>
+            <option value="3" selected>3</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+      </div>
+      <textarea id="review-code" placeholder="Paste your code here..." rows="15" class="code-input"></textarea>
+      <button class="btn" onclick="startReview()">Start Review</button>
+    </div>
+    <div id="review-result" class="review-result" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: HISTORY -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-history">
+  <div class="history-container">
+    <div class="grid" id="kpis">
+      <div class="card"><h2>Sessions (30d)</h2><div class="value" id="kpi-sessions">--</div></div>
+      <div class="card"><h2>Approval Rate</h2><div class="value" id="kpi-approval">--</div></div>
+      <div class="card"><h2>Avg Score</h2><div class="value" id="kpi-score">--</div></div>
+      <div class="card"><h2>Total Cost (30d)</h2><div class="value" id="kpi-cost">--</div></div>
+    </div>
+
+    <div class="section">
+      <h2>Recent Sessions</h2>
+      <div class="card" style="margin-top:12px;overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Verdict</th><th>Score</th><th>Rounds</th><th>Cost</th><th>Duration</th><th>File</th></tr>
+          </thead>
+          <tbody id="sessions-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Model Performance</h2>
+      <div class="card">
+        <table>
+          <thead><tr><th>Model</th><th>Runs</th><th>Avg Score</th><th>Pass Rate</th></tr></thead>
+          <tbody id="models-perf-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/chat.js"></script>
+<script src="/static/dashboard.js"></script>
+</body>
+</html>

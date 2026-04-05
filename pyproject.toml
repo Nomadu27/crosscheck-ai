@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name        = "crosscheck-ai"
-version     = "1.0.0"
+version     = "2.0.0"
 description = "AI Dev Team -- multi-agent coding pipeline where Claude codes and other models advise, debug, review, and plan. Built on OpenRouter."
 readme      = "README.md"
 license     = "LicenseRef-Proprietary"
@@ -33,12 +33,12 @@ dependencies = [
 
 [project.optional-dependencies]
 monitor   = ["insa-its>=1.0"]
-webhook   = ["fastapi>=0.110", "uvicorn>=0.29"]
-dashboard = ["fastapi>=0.110", "uvicorn>=0.29"]
-chat      = ["fastapi>=0.110", "uvicorn>=0.29"]
+webhook   = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+dashboard = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+chat      = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 policy    = ["pyyaml>=6.0"]
 local     = []
-all       = ["insa-its>=1.0", "fastapi>=0.110", "uvicorn>=0.29", "pyyaml>=6.0"]
+all       = ["insa-its>=1.0", "fastapi>=0.110", "uvicorn[standard]>=0.29", "pyyaml>=6.0"]
 dev       = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",

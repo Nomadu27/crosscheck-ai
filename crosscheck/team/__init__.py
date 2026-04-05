@@ -15,13 +15,14 @@ from crosscheck.team.chat import (
 )
 from crosscheck.team.command_parser import CommandParser, ParseResult
 from crosscheck.team.language import LanguageDetector
-from crosscheck.team.roles import DEFAULT_TEAM, RoleSpec, TeamRole
+from crosscheck.team.roles import DEFAULT_TEAM, RoleSpec, TeamRole, build_team
 from crosscheck.team.session import TeamSession
 
 __all__ = [
     "TeamRole",
     "RoleSpec",
     "DEFAULT_TEAM",
+    "build_team",
     "TeamMessage",
     "CodeBlock",
     "ChatHistory",

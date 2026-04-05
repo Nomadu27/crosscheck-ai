@@ -1,37 +1,47 @@
 /**
- * crosscheck AI Dev Team — Group Chat Client
+ * crosscheck AI Dev Team -- Group Chat Client
  * WebSocket client for real-time team communication.
  */
 
 const AGENT_COLORS = {
-  planner:   '#6A5ACD',
-  architect: '#4285F4',
-  coder:     '#10A37F',
-  debugger:  '#FF6D00',
-  security:  '#E94B3C',
-  analyst:   '#34A853',
-  human:     '#c9d1d9',
+  coordinator: '#E94B3C',
+  planner:     '#6A5ACD',
+  architect:   '#4285F4',
+  coder:       '#10A37F',
+  debugger:    '#FF6D00',
+  security:    '#D32F2F',
+  analyst:     '#34A853',
+  observer_1:  '#7B1FA2',
+  observer_2:  '#FF8F00',
+  system:      '#8b949e',
+  human:       '#c9d1d9',
 };
 
 const AGENT_INITIALS = {
-  planner:   'PL',
-  architect: 'AR',
-  coder:     'CO',
-  debugger:  'DB',
-  security:  'SC',
-  analyst:   'AN',
-  human:     'U',
+  coordinator: 'GK',
+  planner:     'PL',
+  architect:   'AR',
+  coder:       'CO',
+  debugger:    'DB',
+  security:    'SC',
+  analyst:     'AN',
+  observer_1:  'O1',
+  observer_2:  'O2',
+  system:      'SY',
+  human:       'U',
 };
 
-const PHASES = ['planning', 'discussion', 'coding', 'review', 'done'];
+const PHASES = ['planning', 'discussion', 'coding', 'review', 'dissent', 'approval', 'testing', 'done'];
 
 let ws = null;
 let sessionActive = false;
 let currentPhase = null;
 let completedPhases = new Set();
 let teamInfo = [];
+let reconnectTimer = null;
+let intentionalClose = false;
 
-// ─── Init ──────────────────────────────────────────────────────────────────
+// -- Init --
 
 document.addEventListener('DOMContentLoaded', () => {
   loadTeamInfo();
@@ -68,10 +78,24 @@ function renderTeamPanel(team) {
   });
 }
 
-// ─── WebSocket ─────────────────────────────────────────────────────────────
+// -- WebSocket --
 
 function connect() {
+  // Clean up existing connection
+  if (ws) {
+    intentionalClose = true;
+    try { ws.close(); } catch (_e) { /* ignore */ }
+    ws = null;
+  }
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  intentionalClose = false;
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  updateStatus('connecting', 'Connecting...');
+
   ws = new WebSocket(`${protocol}//${location.host}/ws/team`);
 
   ws.onopen = () => {
@@ -80,10 +104,18 @@ function connect() {
   };
 
   ws.onclose = () => {
-    updateStatus('disconnected', 'Disconnected');
-    console.log('WebSocket disconnected');
-    // Reconnect after 3 seconds
-    setTimeout(connect, 3000);
+    ws = null;
+    if (intentionalClose) {
+      // We closed it ourselves, don't reconnect
+      return;
+    }
+    if (sessionActive) {
+      // Session was running, try to reconnect
+      updateStatus('disconnected', 'Reconnecting...');
+      reconnectTimer = setTimeout(connect, 3000);
+    } else {
+      updateStatus('disconnected', 'Disconnected');
+    }
   };
 
   ws.onerror = (e) => {
@@ -94,6 +126,20 @@ function connect() {
     const data = JSON.parse(event.data);
     handleMessage(data);
   };
+}
+
+function disconnect() {
+  intentionalClose = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (ws) {
+    try { ws.close(); } catch (_e) { /* ignore */ }
+    ws = null;
+  }
+  sessionActive = false;
+  updateStatus('disconnected', 'Disconnected');
 }
 
 function handleMessage(data) {
@@ -108,52 +154,123 @@ function handleMessage(data) {
     case 'typing':
       showTypingIndicator(data.role, data.display_name);
       break;
+    case 'change_proposal':
+      showChangeProposal(data);
+      break;
+    case 'test_results':
+      showTestResults(data);
+      break;
     case 'done':
       sessionDone(data);
       break;
     case 'error':
-      addSystemMessage(`Error: ${data.message}`);
+      addSystemMessage('Error: ' + data.message);
       break;
     case 'pong':
       break;
   }
 }
 
-// ─── Task Start ────────────────────────────────────────────────────────────
+// -- Task Start --
+
+function showChatScreen() {
+  const taskScreen = document.getElementById('task-screen');
+  const chatScreen = document.getElementById('chat-screen');
+  if (taskScreen) taskScreen.style.display = 'none';
+  if (chatScreen) {
+    chatScreen.classList.remove('chat-screen-hidden');
+    chatScreen.style.display = 'flex';
+  }
+}
 
 function startTask() {
   const textarea = document.getElementById('task-textarea');
-  const task = textarea.value.trim();
+  const task = textarea ? textarea.value.trim() : '';
   if (!task) return;
 
-  // Hide task input, show chat
-  document.getElementById('task-screen').style.display = 'none';
-  document.getElementById('chat-screen').style.display = 'flex';
+  const codeTextarea = document.getElementById('code-textarea');
+  const code = codeTextarea ? codeTextarea.value.trim() : '';
 
+  // Show chat UI
+  showChatScreen();
+
+  // Reset state
   sessionActive = true;
+  currentPhase = null;
+  completedPhases.clear();
+  const msgContainer = document.getElementById('chat-messages');
+  if (msgContainer) msgContainer.innerHTML = '';
+
+  // Connect WebSocket
   connect();
 
-  // Wait for connection then send
+  // Wait for connection then send task
   const waitAndSend = setInterval(() => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       clearInterval(waitAndSend);
-      ws.send(JSON.stringify({ type: 'start_task', task: task }));
-      addSystemMessage(`Task: ${task}`);
+
+      // Get API key from dashboard.js (localStorage) or env
+      const key = (typeof apiKey !== 'undefined' && apiKey) ? apiKey : '';
+
+      ws.send(JSON.stringify({
+        type: 'start_task',
+        task: task,
+        code: code,
+        team_config: (typeof teamConfig !== 'undefined') ? teamConfig : {},
+        api_key: key,
+      }));
+      addSystemMessage('Task: ' + task);
     }
   }, 100);
+
+  // Timeout after 10 seconds if can't connect
+  setTimeout(() => {
+    clearInterval(waitAndSend);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      addSystemMessage('Failed to connect to server. Check that the server is running.');
+    }
+  }, 10000);
 }
 
-// ─── Message Rendering ─────────────────────────────────────────────────────
+// Start a new task from the chat input bar (when no session is active)
+function startTaskFromChat(task) {
+  showChatScreen();
+
+  sessionActive = true;
+  currentPhase = null;
+  completedPhases.clear();
+
+  connect();
+
+  const waitAndSend = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      clearInterval(waitAndSend);
+      const key = (typeof apiKey !== 'undefined' && apiKey) ? apiKey : '';
+      ws.send(JSON.stringify({
+        type: 'start_task',
+        task: task,
+        team_config: (typeof teamConfig !== 'undefined') ? teamConfig : {},
+        api_key: key,
+      }));
+      addSystemMessage('Task: ' + task);
+    }
+  }, 100);
+
+  setTimeout(() => {
+    clearInterval(waitAndSend);
+  }, 10000);
+}
+
+// -- Message Rendering --
 
 function addMessage(data) {
   const container = document.getElementById('chat-messages');
+  if (!container) return;
   const div = document.createElement('div');
   div.className = 'message';
 
   const color = AGENT_COLORS[data.role] || '#8b949e';
   const initials = AGENT_INITIALS[data.role] || '??';
-
-  // Process content: convert markdown code blocks
   const content = renderContent(data.content || '');
 
   div.innerHTML = `
@@ -171,7 +288,6 @@ function addMessage(data) {
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 
-  // Update phase if agent message includes it
   if (data.phase && data.phase !== currentPhase) {
     setPhase(data.phase);
   }
@@ -179,6 +295,7 @@ function addMessage(data) {
 
 function addSystemMessage(text) {
   const container = document.getElementById('chat-messages');
+  if (!container) return;
   const div = document.createElement('div');
   div.className = 'system-message';
   div.textContent = text;
@@ -188,34 +305,24 @@ function addSystemMessage(text) {
 
 function renderContent(text) {
   if (!text) return '';
-
-  // Escape HTML first
   let html = escapeHtml(text);
-
-  // Convert fenced code blocks
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
     return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
   });
-
-  // Convert inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-  // Convert newlines to <br> (outside of pre blocks)
   html = html.replace(/\n/g, '<br>');
-
-  // Fix <br> inside <pre> tags — remove them
   html = html.replace(/<pre>([\s\S]*?)<\/pre>/g, (match) => {
     return match.replace(/<br>/g, '\n');
   });
-
   return html;
 }
 
-// ─── Typing Indicator ──────────────────────────────────────────────────────
+// -- Typing Indicator --
 
 function showTypingIndicator(role, displayName) {
   removeTypingIndicator(role);
   const container = document.getElementById('chat-messages');
+  if (!container) return;
   const div = document.createElement('div');
   div.className = 'typing-indicator';
   div.id = `typing-${role}`;
@@ -238,7 +345,7 @@ function removeTypingIndicator(role) {
   if (el) el.remove();
 }
 
-// ─── Phase Management ──────────────────────────────────────────────────────
+// -- Phase Management --
 
 function setPhase(phase) {
   if (currentPhase) {
@@ -261,7 +368,7 @@ function updatePhaseUI() {
   });
 }
 
-// ─── User Input ────────────────────────────────────────────────────────────
+// -- User Input --
 
 function setupInputHandlers() {
   // Task screen: Enter to start
@@ -285,7 +392,6 @@ function setupInputHandlers() {
       }
     });
 
-    // @mention detection
     chatInput.addEventListener('input', () => {
       checkMentionTrigger(chatInput);
     });
@@ -294,8 +400,17 @@ function setupInputHandlers() {
 
 function sendMessage() {
   const input = document.getElementById('chat-input');
+  if (!input) return;
   const content = input.value.trim();
-  if (!content || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!content) return;
+
+  // If no active session, start a new one using this message as the task
+  if (!sessionActive || !ws || ws.readyState !== WebSocket.OPEN) {
+    input.value = '';
+    autoResize(input);
+    startTaskFromChat(content);
+    return;
+  }
 
   ws.send(JSON.stringify({
     type: 'user_message',
@@ -325,7 +440,7 @@ function insertMention(role) {
   hideMentionDropdown();
 }
 
-// ─── @mention Autocomplete ─────────────────────────────────────────────────
+// -- @mention Autocomplete --
 
 function checkMentionTrigger(input) {
   const val = input.value;
@@ -334,8 +449,7 @@ function checkMentionTrigger(input) {
   const mentionMatch = textBefore.match(/@(\w*)$/);
 
   if (mentionMatch) {
-    const query = mentionMatch[1].toLowerCase();
-    showMentionDropdown(query);
+    showMentionDropdown(mentionMatch[1].toLowerCase());
   } else {
     hideMentionDropdown();
   }
@@ -361,9 +475,7 @@ function showMentionDropdown(query) {
       <div class="dot" style="background:${AGENT_COLORS[role]}"></div>
       <span>@${role}</span>
     `;
-    opt.onclick = () => {
-      completeMention(role);
-    };
+    opt.onclick = () => { completeMention(role); };
     dropdown.appendChild(opt);
   });
 
@@ -389,19 +501,26 @@ function completeMention(role) {
   hideMentionDropdown();
 }
 
-// ─── Session Done ──────────────────────────────────────────────────────────
+// -- Session Done --
 
 function sessionDone(data) {
   setPhase('done');
-  addSystemMessage(`Session complete. ${data.message_count || 0} messages exchanged.`);
+  sessionActive = false;
+  addSystemMessage('Session complete. ' + (data.message_count || 0) + ' messages exchanged. Type a new task to start again.');
+  // Don't reconnect after session ends
+  intentionalClose = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
 }
 
-// ─── Utilities ─────────────────────────────────────────────────────────────
+// -- Utilities --
 
 function updateStatus(cls, text) {
   const el = document.getElementById('conn-status');
   if (el) {
-    el.className = `status ${cls}`;
+    el.className = 'status ' + cls;
     el.textContent = text;
   }
 }
@@ -417,12 +536,13 @@ function formatTime(ts) {
   try {
     const d = new Date(ts);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
+  } catch (_e) {
     return '';
   }
 }
 
 function autoResize(textarea) {
+  if (!textarea) return;
   textarea.style.height = 'auto';
   textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
 }
@@ -435,7 +555,7 @@ function toggleTheme() {
 
 function exportTranscript() {
   const messages = document.querySelectorAll('.message');
-  let text = '# crosscheck AI Dev Team — Transcript\n\n';
+  let text = '# crosscheck AI Dev Team -- Transcript\n\n';
   messages.forEach(msg => {
     const name = msg.querySelector('.message-name')?.textContent || 'Unknown';
     const content = msg.querySelector('.message-content')?.textContent || '';
@@ -447,7 +567,108 @@ function exportTranscript() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `crosscheck-transcript-${new Date().toISOString().slice(0,10)}.md`;
+  a.download = 'crosscheck-transcript-' + new Date().toISOString().slice(0,10) + '.md';
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// -- Change Proposal --
+
+function showChangeProposal(data) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'proposal-card';
+  div.id = 'proposal-' + data.proposal_id;
+
+  let changesHtml = '';
+  (data.changes || []).forEach((change, i) => {
+    const diffText = (data.diffs && data.diffs[i]) ? escapeHtml(data.diffs[i]) : '';
+    changesHtml += `
+      <div class="proposal-file">
+        <div class="proposal-file-header">
+          <span class="proposal-action proposal-action-${change.action}">${change.action.toUpperCase()}</span>
+          <span class="proposal-filename">${escapeHtml(change.filename)}</span>
+        </div>
+        ${diffText ? '<pre class="proposal-diff">' + diffText + '</pre>' : ''}
+      </div>
+    `;
+  });
+
+  const summaryHtml = data.coordinator_summary
+    ? '<div class="proposal-summary"><strong>Coordinator:</strong> ' + renderContent(data.coordinator_summary) + '</div>'
+    : '';
+
+  let findingsHtml = '';
+  if (data.observer_findings && data.observer_findings.length > 0) {
+    findingsHtml = '<div class="proposal-findings"><strong>Observer Findings:</strong><ul>';
+    data.observer_findings.forEach(f => {
+      findingsHtml += '<li>' + renderContent(f.substring(0, 500)) + '</li>';
+    });
+    findingsHtml += '</ul></div>';
+  }
+
+  div.innerHTML = `
+    <div class="proposal-header">
+      <span class="proposal-icon">&#128221;</span>
+      <span class="proposal-title">Change Proposal #${escapeHtml(data.proposal_id)}</span>
+    </div>
+    ${summaryHtml}
+    ${findingsHtml}
+    <div class="proposal-changes">${changesHtml}</div>
+    <div class="proposal-actions">
+      <button class="btn-accept" onclick="sendProposalDecision('${data.proposal_id}', 'accept')">Accept</button>
+      <button class="btn-reject" onclick="sendProposalDecision('${data.proposal_id}', 'reject')">Reject</button>
+    </div>
+  `;
+
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  setPhase('approval');
+}
+
+function sendProposalDecision(proposalId, decision, edits) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const payload = {
+    type: 'proposal_decision',
+    proposal_id: proposalId,
+    decision: decision,
+  };
+  if (edits) payload.edits = edits;
+  ws.send(JSON.stringify(payload));
+
+  const card = document.getElementById('proposal-' + proposalId);
+  if (card) {
+    const actions = card.querySelector('.proposal-actions');
+    if (actions) {
+      const label = decision === 'accept' ? 'Accepted' : 'Rejected';
+      const cls = decision === 'accept' ? 'decision-accepted' : 'decision-rejected';
+      actions.innerHTML = '<span class="proposal-decision ' + cls + '">' + label + '</span>';
+    }
+  }
+
+  addSystemMessage('Proposal ' + proposalId + ': ' + decision.toUpperCase());
+}
+
+// -- Test Results --
+
+function showTestResults(data) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'test-results ' + (data.passed ? 'test-passed' : 'test-failed');
+
+  const icon = data.passed ? '&#9989;' : '&#10060;';
+  const status = data.passed ? 'ALL TESTS PASSED' : 'TESTS FAILED';
+
+  div.innerHTML = `
+    <div class="test-header">
+      <span class="test-icon">${icon}</span>
+      <span class="test-status">${status}</span>
+    </div>
+    <pre class="test-output">${escapeHtml(data.content || '')}</pre>
+  `;
+
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
 }

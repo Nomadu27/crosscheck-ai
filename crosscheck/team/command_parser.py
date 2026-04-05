@@ -35,12 +35,15 @@ class ParseResult:
 # ---------------------------------------------------------------------------
 
 ROLE_ALIASES: dict[TeamRole, list[str]] = {
+    TeamRole.COORDINATOR: ["coordinator", "coord", "safety", "gate"],
     TeamRole.PLANNER: ["planner", "ceo", "boss", "lead", "plan"],
     TeamRole.ARCHITECT: ["architect", "cto", "designer", "design"],
     TeamRole.CODER: ["coder", "dev", "programmer", "builder", "code", "write"],
     TeamRole.DEBUGGER: ["debugger", "debug", "tester", "qa", "bug"],
     TeamRole.SECURITY: ["security", "sec", "guard", "vuln"],
     TeamRole.ANALYST: ["analyst", "analyzer", "flow", "perf", "performance"],
+    TeamRole.OBSERVER_1: ["observer1", "observer_1", "obs1"],
+    TeamRole.OBSERVER_2: ["observer2", "observer_2", "obs2"],
 }
 
 MODEL_ALIASES: dict[str, list[str]] = {

@@ -144,24 +144,19 @@ class CrosscheckMonitor:
                 sender_id=sender_id,
                 receiver_id=receiver_id,
                 llm_id=llm_id,
-                metadata={
-                    "round": round_num,
-                    "hop": hop,
-                    "platform": "crosscheck-ai",
-                }
             )
 
             monitor_result = result["monitor_result"]
             anomalies = []
 
-            for raw in monitor_result.get("anomalies", []):
+            for raw in monitor_result.anomalies:
                 event = AnomalyEvent(
                     round_num=round_num,
-                    source=f"{sender_id}→{receiver_id}",
-                    anomaly_type=raw.get("type", "unknown"),
-                    severity=raw.get("severity", "low"),
-                    description=raw.get("description", ""),
-                    raw=raw,
+                    source=f"{sender_id}->{receiver_id}",
+                    anomaly_type=getattr(raw, "type", "unknown"),
+                    severity=getattr(getattr(raw, "severity", "low"), "value", str(getattr(raw, "severity", "low"))),
+                    description=getattr(raw, "description", ""),
+                    raw=raw.to_dict() if hasattr(raw, "to_dict") else {},
                 )
                 anomalies.append(event)
                 self._history.append(event)
@@ -169,7 +164,7 @@ class CrosscheckMonitor:
                     self.on_anomaly(event)
 
             # Let InsAIts decide the action
-            should_block = monitor_result.should_halt() or monitor_result.should_block()
+            should_block = monitor_result.should_halt() or monitor_result.should_alert()
 
             # Optional: let InsAIts intervene automatically
             if should_block and hasattr(self._monitor, "intervene"):

@@ -357,17 +357,25 @@ def local_review(file, read_stdin, supervisor, analyzer, coder, ollama_url, max_
 
 @click.command("team")
 @click.option("--task", "-t", required=True, help="Task description for the team")
-@click.option("--file", "-f", "code_file", default=None, type=click.Path(exists=True),
-              help="Code file to work on")
+@click.option("--file", "-f", "code_files", multiple=True, type=click.Path(exists=True),
+              help="Code file(s) to work on (repeatable: -f a.py -f b.py)")
+@click.option("--project", "-p", default=None, type=click.Path(exists=True, file_okay=False),
+              help="Project directory for full workspace access")
 @click.option("--models", default=None,
               help="Override model assignments (role:model,...) e.g. coder:openai/gpt-5")
 @click.option("--rounds", default=3, type=int, help="Max iteration rounds")
 @click.option("--api-key", default=None, envvar="CROSSCHECK_API_KEY")
 @click.option("--output", default="terminal", type=click.Choice(["terminal", "json", "transcript"]))
-def team_cmd(task, code_file, models, rounds, api_key, output):
+@click.option("--auto-apply", is_flag=True, help="Apply approved changes to disk (requires --project)")
+@click.option("--watch", is_flag=True, help="Watch project for external changes (cowork mode)")
+def team_cmd(task, code_files, project, models, rounds, api_key, output, auto_apply, watch):
     """Launch an AI Dev Team session in the terminal.
 
-    Example: crosscheck team -t "Add authentication" -f app.py
+    Examples:
+      crosscheck team -t "Add authentication" -f app.py
+      crosscheck team -t "Audit security" --project /path/to/project
+      crosscheck team -t "Add logging" --project . --auto-apply
+      crosscheck team -t "Refactor" --project . --auto-apply --watch
     """
     from crosscheck.client import OpenRouterClient
     from crosscheck.team import TeamRole, TeamSession, build_team
@@ -376,9 +384,26 @@ def team_cmd(task, code_file, models, rounds, api_key, output):
         err_console.print("No CROSSCHECK_API_KEY found.")
         sys.exit(1)
 
+    # Validate flag dependencies
+    if auto_apply and not project:
+        raise click.UsageError("--auto-apply requires --project")
+    if watch and not project:
+        raise click.UsageError("--watch requires --project")
+
+    # Build code from file(s)
     code = ""
-    if code_file:
-        code = Path(code_file).read_text(encoding="utf-8", errors="replace")
+    if code_files:
+        for cf in code_files:
+            p = Path(cf)
+            code += f"\n# === FILE: {p.name} ===\n"
+            code += p.read_text(encoding="utf-8", errors="replace")
+            code += "\n"
+
+    # Create workspace if --project given
+    workspace = None
+    if project:
+        from crosscheck.team.workspace import ProjectWorkspace
+        workspace = ProjectWorkspace(root=project)
 
     # Parse model overrides
     team = None
@@ -396,24 +421,111 @@ def team_cmd(task, code_file, models, rounds, api_key, output):
 
     console.print("[bold cyan]crosscheck AI Dev Team[/bold cyan]")
     console.print(f"  Task: {task}")
-    if code_file:
-        console.print(f"  File: {code_file}")
+    if code_files:
+        console.print(f"  Files: {', '.join(code_files)}")
+    if workspace:
+        console.print(f"  Project: {workspace.root}")
+    if auto_apply:
+        console.print("  Mode: [yellow]auto-apply[/yellow] (changes written to disk after approval)")
+    if watch:
+        console.print("  Mode: [yellow]cowork/watch[/yellow] (watching for external changes)")
     console.print(f"  Rounds: {rounds}")
     console.print()
 
+    def _safe_text(text: str) -> str:
+        """Sanitize text for Windows console (cp1252 safe)."""
+        return text.encode("ascii", errors="replace").decode("ascii")
+
     async def run():
         client = OpenRouterClient(api_key=api_key)
-        session = TeamSession(client=client, team=team, max_rounds=rounds)
-        return await session.run(task=task, code=code)
+
+        # Initialize InsAIts monitor if available
+        monitor = None
+        try:
+            from crosscheck.monitor import CrosscheckMonitor
+            monitor = CrosscheckMonitor(enabled=True)
+            if monitor.enabled:
+                console.print("  [green]InsAIts monitoring active[/green]")
+        except Exception:
+            pass  # InsAIts not available — graceful no-op
+
+        session = TeamSession(
+            client=client, team=team, max_rounds=rounds,
+            workspace=workspace, monitor=monitor,
+        )
+
+        if workspace and auto_apply:
+            # Terminal approval gate: monitor for proposals concurrently
+            async def approval_monitor():
+                """Watch for APPROVAL phase and prompt user in terminal."""
+                from crosscheck.team.chat import SessionPhase
+                while session.phase != SessionPhase.DONE:
+                    await asyncio.sleep(0.5)
+                    if (
+                        session.phase == SessionPhase.APPROVAL
+                        and session._current_proposal is not None
+                        and not session._approval_event.is_set()
+                    ):
+                        proposal = session._current_proposal
+                        console.print()
+                        console.print("[bold yellow]--- CHANGE PROPOSAL ---[/bold yellow]")
+                        for change in proposal.changes:
+                            console.print(
+                                f"  [{change.action.upper()}] "
+                                f"[cyan]{_safe_text(change.filename)}[/cyan]"
+                            )
+                            if change.diff:
+                                for dline in change.diff.split("\n")[:15]:
+                                    console.print(f"    [dim]{_safe_text(dline)}[/dim]")
+                        if proposal.coordinator_summary:
+                            console.print(
+                                f"\n  [bold]Coordinator:[/bold] "
+                                f"{_safe_text(proposal.coordinator_summary[:400])}"
+                            )
+                        if proposal.observer_findings:
+                            for i, finding in enumerate(proposal.observer_findings, 1):
+                                console.print(
+                                    f"  [bold]Observer {i}:[/bold] "
+                                    f"{_safe_text(finding[:200])}"
+                                )
+                        console.print("[bold yellow]--- END PROPOSAL ---[/bold yellow]")
+
+                        # Prompt user in thread executor (blocking I/O)
+                        loop = asyncio.get_event_loop()
+                        decision = await loop.run_in_executor(
+                            None,
+                            lambda: click.prompt(
+                                "\nDecision",
+                                type=click.Choice(["accept", "reject", "skip"]),
+                                default="accept",
+                            ),
+                        )
+                        if decision == "skip":
+                            decision = "accept"
+                        session.set_approval_decision(decision)
+
+            monitor_task = asyncio.create_task(approval_monitor())
+            try:
+                history = await session.run(task=task, code=code)
+            finally:
+                monitor_task.cancel()
+        else:
+            history = await session.run(task=task, code=code)
+
+        # Watch mode: keep session alive and watch for external file changes
+        if watch and workspace:
+            await _run_watch_loop(session, workspace, _safe_text)
+
+        return history
 
     history = asyncio.run(run())
 
     if output == "json":
         import json as _json
         data = [m.to_dict() for m in history.messages]
-        console.print(_json.dumps(data, indent=2, default=str))
+        console.print(_json.dumps(data, indent=2, default=str, ensure_ascii=True))
     elif output == "transcript":
-        console.print(history.to_transcript())
+        console.print(_safe_text(history.to_transcript()))
     else:
         # Terminal: Rich-formatted output
         for msg in history.messages:
@@ -424,16 +536,16 @@ def team_cmd(task, code_file, models, rounds, api_key, output):
                     color = spec.color
                     break
             console.print(
-                f"[bold {color}]{msg.display_name}[/bold {color}] "
+                f"[bold {color}]{_safe_text(msg.display_name)}[/bold {color}] "
                 f"[dim]({msg.phase})[/dim]"
             )
-            console.print(f"  {msg.content[:500]}")
+            console.print(f"  {_safe_text(msg.content[:500])}")
             if msg.code_blocks:
                 for cb in msg.code_blocks:
-                    console.print(f"\n  [cyan]{cb.filename}[/cyan]")
+                    console.print(f"\n  [cyan]{_safe_text(cb.filename)}[/cyan]")
                     console.print(f"  ```{cb.language}")
                     for line in cb.content.split("\n")[:20]:
-                        console.print(f"  {line}")
+                        console.print(f"  {_safe_text(line)}")
                     console.print("  ```")
             console.print()
 
@@ -441,6 +553,78 @@ def team_cmd(task, code_file, models, rounds, api_key, output):
         f"[bold green]Done.[/bold green] "
         f"{len(history.messages)} messages, session {history.session_id}"
     )
+
+
+async def _run_watch_loop(session, workspace, _safe_text):
+    """Cowork/watch mode: watch project for external changes and get team feedback.
+
+    Uses watchdog to monitor the project directory. When files change,
+    notifies Architect + Debugger + Security for targeted review.
+    """
+    try:
+        from watchdog.events import FileSystemEventHandler
+        from watchdog.observers import Observer
+    except ImportError:
+        err_console.print("watchdog required for --watch: pip install watchdog")
+        return
+
+    _WATCH_EXTS = {".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java", ".kt"}
+    _DEBOUNCE_SEC = 0.5
+
+    pending: dict[str, float] = {}
+    import time
+
+    class _ChangeHandler(FileSystemEventHandler):
+        def on_modified(self, event):
+            if event.is_directory:
+                return
+            ext = Path(event.src_path).suffix.lower()
+            if ext in _WATCH_EXTS:
+                pending[event.src_path] = time.time()
+
+    observer = Observer()
+    observer.schedule(_ChangeHandler(), str(workspace.root), recursive=True)
+    observer.start()
+
+    console.print()
+    console.print("[bold cyan]Cowork mode active[/bold cyan] -- watching for external changes")
+    console.print("[dim]Press Ctrl+C to stop[/dim]")
+
+    try:
+        while True:
+            await asyncio.sleep(_DEBOUNCE_SEC)
+            now = time.time()
+            # Process files that haven't changed in the last debounce window
+            ready = [
+                fp for fp, ts in pending.items()
+                if now - ts >= _DEBOUNCE_SEC
+            ]
+            for fp in ready:
+                pending.pop(fp, None)
+                try:
+                    rel = Path(fp).relative_to(workspace.root)
+                    content = Path(fp).read_text(encoding="utf-8", errors="replace")
+                    console.print(f"\n[yellow]File changed: {rel}[/yellow]")
+                    # Ask reviewers (3 agents, not all 9)
+                    review_msg = (
+                        f"@architect @debugger @security External tool changed {rel}. "
+                        f"Review this change:\n```\n{content[:3000]}\n```\n"
+                        f"Flag any issues."
+                    )
+                    responses = await session.inject_human_message(review_msg)
+                    for resp in responses:
+                        console.print(
+                            f"  [bold]{_safe_text(resp.display_name)}:[/bold] "
+                            f"{_safe_text(resp.content[:300])}"
+                        )
+                except Exception as e:
+                    console.print(f"  [red]Error reviewing {fp}: {e}[/red]")
+    except KeyboardInterrupt:
+        pass
+    finally:
+        observer.stop()
+        observer.join()
+        console.print("\n[dim]Watch mode stopped.[/dim]")
 
 
 @click.command("chat")
@@ -471,7 +655,7 @@ def chat_cmd(port, host, api_key, no_open):
         import webbrowser
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
 
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    uvicorn.run(app, host=host, port=port, log_level="warning", ws="wsproto")
 
 
 # ---------------------------------------------------------------------------

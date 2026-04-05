@@ -366,6 +366,61 @@ REGISTRY: list[ModelSpec] = [
         notes        = "Latest dedicated code model — replaces qwen2.5-coder",
     ),
 
+    # =====================================================================
+    # FREE MODELS (OpenRouter :free tier) — verified 2026-04-01
+    # =====================================================================
+
+    ModelSpec(
+        model_id     = "qwen/qwen3.6-plus:free",
+        display_name = "Qwen 3.6 Plus (Free)",
+        tiers        = [Tier.SUPERVISOR, Tier.CODER, Tier.ANALYZER],
+        tasks        = list(Task),
+        context_k    = 1000,
+        provider     = "Qwen",
+        origin       = "chinese",
+        notes        = "FREE — strongest free model, 1M context",
+    ),
+    ModelSpec(
+        model_id     = "nvidia/nemotron-3-super-120b-a12b:free",
+        display_name = "Nemotron 3 Super (Free)",
+        tiers        = [Tier.ANALYZER, Tier.CODER],
+        tasks        = [Task.CODE, Task.PLAN, Task.TEXT],
+        context_k    = 262,
+        provider     = "NVIDIA",
+        origin       = "western",
+        notes        = "FREE — 120B params, strong reasoning",
+    ),
+    ModelSpec(
+        model_id     = "stepfun/step-3.5-flash:free",
+        display_name = "Step 3.5 Flash (Free)",
+        tiers        = [Tier.ANALYZER],
+        tasks        = list(Task),
+        context_k    = 256,
+        provider     = "StepFun",
+        origin       = "chinese",
+        notes        = "FREE — 256K context, fast",
+    ),
+    ModelSpec(
+        model_id     = "minimax/minimax-m2.5:free",
+        display_name = "MiniMax M2.5 (Free)",
+        tiers        = [Tier.ANALYZER],
+        tasks        = list(Task),
+        context_k    = 196,
+        provider     = "MiniMax",
+        origin       = "chinese",
+        notes        = "FREE — 196K context",
+    ),
+    ModelSpec(
+        model_id     = "arcee-ai/trinity-large-preview:free",
+        display_name = "Trinity Large (Free)",
+        tiers        = [Tier.ANALYZER],
+        tasks        = list(Task),
+        context_k    = 131,
+        provider     = "Arcee",
+        origin       = "western",
+        notes        = "FREE — 131K context, preview",
+    ),
+
     # -- Moonshot / Kimi -------------------------------------------------
     ModelSpec(
         model_id     = "moonshotai/kimi-k2.5",

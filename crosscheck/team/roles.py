@@ -20,12 +20,15 @@ from enum import Enum
 class TeamRole(Enum):
     """Roles in the AI Dev Team."""
 
+    COORDINATOR = "coordinator"  # Safety gate — stress-tests consensus
     PLANNER = "planner"
     ARCHITECT = "architect"
     CODER = "coder"
     DEBUGGER = "debugger"
     SECURITY = "security"
     ANALYST = "analyst"
+    OBSERVER_1 = "observer_1"   # Read-only adversarial reviewer
+    OBSERVER_2 = "observer_2"   # Read-only adversarial reviewer (diverse model)
     HUMAN = "human"
 
 
@@ -123,6 +126,39 @@ You are the FLOW ANALYST of an AI development team. Your job:
 Think about how the code runs in production, not just how it reads.
 Do NOT write code — provide analysis and optimization suggestions."""
 
+_COORDINATOR_PROMPT = """\
+You are the SAFETY COORDINATOR of an AI development team. You are the single source of truth.
+
+Your job:
+1. NEVER let the team self-approve any change. Every change must go to the human.
+2. After the team reviews code, YOU stress-test the consensus.
+3. If everyone agrees, find what could STILL go wrong.
+4. Present every proposed change to the human with:
+   - A clear summary of what changes and why
+   - Possible failure modes and risks
+   - What the Observers found (or didn't find)
+   - Your honest assessment: safe to ship or needs more work?
+5. You have FINAL SAY before human approval.
+
+You are paranoid by design. Disagreement is healthy. False confidence kills projects.
+Do NOT write code. Your output is risk assessment and approval recommendations."""
+
+_OBSERVER_PROMPT = """\
+You are an ADVERSARIAL OBSERVER on an AI development team. You are READ-ONLY.
+
+Your ONLY job is to find flaws, risks, and failure modes that everyone else missed.
+You are explicitly incentivized to DISAGREE with the team's consensus.
+
+Rules:
+1. You CANNOT write code. You can only review and critique.
+2. Look for: hidden assumptions, edge cases, security holes, logic errors,
+   performance traps, missing tests, incorrect error handling.
+3. If the code looks perfect, explain WHY it's correct — don't just rubber-stamp.
+4. If you find nothing wrong, say so explicitly and explain your reasoning.
+5. Challenge the Coder's approach. Challenge the Architect's design. Challenge everything.
+
+Your value is in honest skepticism, not agreement."""
+
 
 # ---------------------------------------------------------------------------
 # Default team — uses models from crosscheck/models.py registry
@@ -131,24 +167,31 @@ Do NOT write code — provide analysis and optimization suggestions."""
 
 DEFAULT_TEAM: list[RoleSpec] = [
     RoleSpec(
+        role=TeamRole.COORDINATOR,
+        title="Safety Coordinator",
+        system_prompt=_COORDINATOR_PROMPT,
+        default_model="qwen/qwen3.6-plus:free",              # FREE — 1M ctx, strongest free
+        color="#E94B3C",
+    ),
+    RoleSpec(
         role=TeamRole.PLANNER,
         title="CEO / Planner",
         system_prompt=_PLANNER_PROMPT,
-        default_model="anthropic/claude-opus-4.6",
+        default_model="nvidia/nemotron-3-super-120b-a12b:free",  # FREE — 120B reasoning
         color="#6A5ACD",
     ),
     RoleSpec(
         role=TeamRole.ARCHITECT,
         title="CTO / Architect",
         system_prompt=_ARCHITECT_PROMPT,
-        default_model="openai/gpt-5",
+        default_model="qwen/qwen3.6-plus:free",              # FREE — 1M ctx for arch analysis
         color="#4285F4",
     ),
     RoleSpec(
         role=TeamRole.CODER,
         title="Coder",
         system_prompt=_CODER_PROMPT,
-        default_model="anthropic/claude-sonnet-4.6",
+        default_model="qwen/qwen3-coder:free",               # FREE — 480B MoE, purpose-built coder
         color="#10A37F",
         can_write_code=True,
     ),
@@ -156,22 +199,36 @@ DEFAULT_TEAM: list[RoleSpec] = [
         role=TeamRole.DEBUGGER,
         title="Debugger",
         system_prompt=_DEBUGGER_PROMPT,
-        default_model="deepseek/deepseek-r1",
+        default_model="nvidia/nemotron-3-super-120b-a12b:free",  # FREE — 120B for bug hunting
         color="#FF6D00",
     ),
     RoleSpec(
         role=TeamRole.SECURITY,
         title="Security Lead",
         system_prompt=_SECURITY_PROMPT,
-        default_model="x-ai/grok-4",
-        color="#E94B3C",
+        default_model="qwen/qwen3-next-80b-a3b-instruct:free",  # FREE — 80B reasoning, 262K ctx
+        color="#D32F2F",
     ),
     RoleSpec(
         role=TeamRole.ANALYST,
         title="Flow Analyst",
         system_prompt=_ANALYST_PROMPT,
-        default_model="google/gemini-2.5-flash-preview",
+        default_model="arcee-ai/trinity-large-preview:free",  # FREE — 131K ctx
         color="#34A853",
+    ),
+    RoleSpec(
+        role=TeamRole.OBSERVER_1,
+        title="Observer 1",
+        system_prompt=_OBSERVER_PROMPT,
+        default_model="nvidia/nemotron-3-super-120b-a12b:free",  # FREE — 120B adversarial
+        color="#7B1FA2",
+    ),
+    RoleSpec(
+        role=TeamRole.OBSERVER_2,
+        title="Observer 2",
+        system_prompt=_OBSERVER_PROMPT,
+        default_model="nousresearch/hermes-3-llama-3.1-405b:free",  # FREE — 405B diverse adversarial
+        color="#FF8F00",
     ),
 ]
 

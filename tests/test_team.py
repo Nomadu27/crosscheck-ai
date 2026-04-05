@@ -33,25 +33,31 @@ from crosscheck.team.session import ReviewResult, TeamSession
 class TestTeamRole:
 
     def test_all_roles_defined(self):
-        """TeamRole enum has 7 values (6 agents + HUMAN)."""
-        assert len(TeamRole) == 7
+        """TeamRole enum has 10 values (9 agents + HUMAN)."""
+        assert len(TeamRole) == 10
         assert TeamRole.HUMAN in TeamRole
+        assert TeamRole.COORDINATOR in TeamRole
+        assert TeamRole.OBSERVER_1 in TeamRole
+        assert TeamRole.OBSERVER_2 in TeamRole
 
     def test_role_values_are_strings(self):
         assert TeamRole.PLANNER.value == "planner"
         assert TeamRole.CODER.value == "coder"
 
-    def test_default_team_has_six_agents(self):
-        """DEFAULT_TEAM has 6 RoleSpecs (no HUMAN)."""
-        assert len(DEFAULT_TEAM) == 6
+    def test_default_team_has_nine_agents(self):
+        """DEFAULT_TEAM has 9 RoleSpecs (no HUMAN)."""
+        assert len(DEFAULT_TEAM) == 9
         roles = {s.role for s in DEFAULT_TEAM}
         assert TeamRole.HUMAN not in roles
 
     def test_default_team_all_roles_covered(self):
         """Every non-HUMAN role has a default spec."""
         roles = {s.role for s in DEFAULT_TEAM}
-        expected = {TeamRole.PLANNER, TeamRole.ARCHITECT, TeamRole.CODER,
-                    TeamRole.DEBUGGER, TeamRole.SECURITY, TeamRole.ANALYST}
+        expected = {
+            TeamRole.COORDINATOR, TeamRole.PLANNER, TeamRole.ARCHITECT,
+            TeamRole.CODER, TeamRole.DEBUGGER, TeamRole.SECURITY,
+            TeamRole.ANALYST, TeamRole.OBSERVER_1, TeamRole.OBSERVER_2,
+        }
         assert roles == expected
 
     def test_only_coder_can_write_code(self):
@@ -78,7 +84,7 @@ class TestTeamRole:
 
     def test_build_team_no_overrides(self):
         team = build_team()
-        assert len(team) == 6
+        assert len(team) == 9
         assert team[0].default_model == DEFAULT_TEAM[0].default_model
 
     def test_build_team_with_override(self):
@@ -87,7 +93,7 @@ class TestTeamRole:
         assert coder.default_model == "openai/gpt-5"
         # Other roles unchanged
         planner = next(s for s in team if s.role == TeamRole.PLANNER)
-        assert planner.default_model == DEFAULT_TEAM[0].default_model
+        assert planner.default_model == DEFAULT_TEAM[1].default_model
 
     def test_display_name_format(self):
         spec = get_role_spec(TeamRole.CODER)
@@ -381,10 +387,13 @@ class TestLanguageDetector:
 class TestSessionPhase:
 
     def test_all_phases(self):
-        assert len(SessionPhase) == 6
+        assert len(SessionPhase) == 9
         phases = [p.value for p in SessionPhase]
         assert "planning" in phases
         assert "coding" in phases
+        assert "dissent" in phases
+        assert "approval" in phases
+        assert "testing" in phases
         assert "done" in phases
 
 
@@ -455,7 +464,7 @@ class TestTeamSession:
         client = _mock_client()
         session = TeamSession(client=client)
         assert session.phase == SessionPhase.PLANNING
-        assert len(session.team) == 6
+        assert len(session.team) == 9
         assert session.max_rounds == 3
 
     @pytest.mark.asyncio
@@ -539,8 +548,8 @@ class TestTeamSession:
 
         responses = await session.inject_human_message("What do you all think?")
 
-        # Should get responses from all 6 team members
-        assert len(responses) == 6
+        # Should get responses from all 9 team members
+        assert len(responses) == 9
 
     @pytest.mark.asyncio
     async def test_session_max_rounds_limit(self):
@@ -618,11 +627,14 @@ class TestChatServer:
         resp = client.get("/api/team")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 6
+        assert len(data) == 9
         roles = [m["role"] for m in data]
+        assert "coordinator" in roles
         assert "planner" in roles
         assert "coder" in roles
         assert "debugger" in roles
+        assert "observer_1" in roles
+        assert "observer_2" in roles
 
     def test_chat_app_index_serves_html(self):
         """GET / should return HTML."""
@@ -642,6 +654,93 @@ class TestChatServer:
         assert (ui_dir / "index.html").exists()
         assert (ui_dir / "chat.js").exists()
         assert (ui_dir / "style.css").exists()
+
+    def test_dashboard_files_exist(self):
+        """Dashboard UI files should exist."""
+        from pathlib import Path
+        ui_dir = Path(__file__).parent.parent / "crosscheck" / "chat_ui"
+        assert (ui_dir / "dashboard.html").exists()
+        assert (ui_dir / "dashboard.css").exists()
+        assert (ui_dir / "dashboard.js").exists()
+
+    def test_dashboard_served_as_index(self):
+        """GET / should serve dashboard.html."""
+        from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app()
+        client = TestClient(app)
+        resp = client.get("/")
+        assert resp.status_code == 200
+        # dashboard.html has tab-btn elements
+        assert "tab-btn" in resp.text
+        assert "Setup" in resp.text
+
+    def test_models_endpoint(self):
+        """GET /api/models should return the full model registry."""
+        from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app()
+        client = TestClient(app)
+        resp = client.get("/api/models")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) > 20  # We have 31 models
+        # Check structure
+        first = data[0]
+        assert "model_id" in first
+        assert "display_name" in first
+        assert "provider" in first
+        assert "tiers" in first
+        assert "context_k" in first
+        assert "origin" in first
+
+    def test_test_key_no_key(self):
+        """POST /api/test-key with no key should return error."""
+        from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app()
+        client = TestClient(app)
+        resp = client.post("/api/test-key", json={"api_key": ""})
+        assert resp.status_code == 400
+        data = resp.json()
+        assert data["valid"] is False
+
+    def test_sessions_endpoint_returns_list(self):
+        """GET /api/sessions should return a list (empty if no DB)."""
+        from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app()
+        client = TestClient(app)
+        resp = client.get("/api/sessions")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_model_performance_endpoint(self):
+        """GET /api/model-performance should return a list."""
+        from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app()
+        client = TestClient(app)
+        resp = client.get("/api/model-performance")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_review_endpoint_no_code(self):
+        """POST /api/review with no code should return error."""
+        from starlette.testclient import TestClient
+
+        from crosscheck.chat_server import create_chat_app
+        app = create_chat_app()
+        client = TestClient(app)
+        resp = client.post("/api/review", json={"code": "", "api_key": "test"})
+        assert resp.status_code == 400
+        assert "error" in resp.json()
 
 
 # ── CLI Extensions (team + chat) ────────────────────────────────────────────
@@ -700,3 +799,319 @@ class TestCLITeamChat:
         runner = CliRunner(env={"CROSSCHECK_API_KEY": ""})
         result = runner.invoke(team_cmd, ["-t", "test task"])
         assert result.exit_code != 0
+
+    def test_team_cmd_has_project_option(self):
+        """team command should have --project/-p option."""
+        from crosscheck.cli_extensions import team_cmd
+        param_names = {p.name for p in team_cmd.params}
+        assert "project" in param_names
+
+    def test_team_cmd_has_auto_apply_option(self):
+        """team command should have --auto-apply flag."""
+        from crosscheck.cli_extensions import team_cmd
+        param_names = {p.name for p in team_cmd.params}
+        assert "auto_apply" in param_names
+
+    def test_team_cmd_has_watch_option(self):
+        """team command should have --watch flag."""
+        from crosscheck.cli_extensions import team_cmd
+        param_names = {p.name for p in team_cmd.params}
+        assert "watch" in param_names
+
+    def test_team_cmd_multi_file(self):
+        """team -f should accept multiple files (multiple=True)."""
+        from crosscheck.cli_extensions import team_cmd
+        file_param = next(p for p in team_cmd.params if p.name == "code_files")
+        assert file_param.multiple is True
+
+    def test_auto_apply_requires_project(self):
+        """--auto-apply without --project should error."""
+        from click.testing import CliRunner
+
+        from crosscheck.cli_extensions import team_cmd
+        runner = CliRunner(env={"CROSSCHECK_API_KEY": "test-key"})
+        result = runner.invoke(team_cmd, ["-t", "task", "--auto-apply"])
+        assert result.exit_code != 0
+        assert "project" in result.output.lower() or "project" in str(result.exception).lower()
+
+    def test_watch_requires_project(self):
+        """--watch without --project should error."""
+        from click.testing import CliRunner
+
+        from crosscheck.cli_extensions import team_cmd
+        runner = CliRunner(env={"CROSSCHECK_API_KEY": "test-key"})
+        result = runner.invoke(team_cmd, ["-t", "task", "--watch"])
+        assert result.exit_code != 0
+        assert "project" in result.output.lower() or "project" in str(result.exception).lower()
+
+    def test_multi_file_concatenation(self, tmp_path):
+        """Multiple -f files should be concatenated with headers."""
+        f1 = tmp_path / "a.py"
+        f1.write_text("x = 1", encoding="utf-8")
+        f2 = tmp_path / "b.py"
+        f2.write_text("y = 2", encoding="utf-8")
+
+        from click.testing import CliRunner
+
+        from crosscheck.cli_extensions import team_cmd
+        # We can't run the full command (needs API), but we can verify
+        # the options parse correctly by checking help
+        runner = CliRunner()
+        result = runner.invoke(team_cmd, ["--help"])
+        assert "-f" in result.output
+        assert "repeatable" in result.output.lower() or "code file" in result.output.lower()
+
+
+# ── Workspace ───────────────────────────────────────────────────────────────
+
+class TestProjectWorkspace:
+    """Tests for crosscheck.team.workspace.ProjectWorkspace."""
+
+    def test_workspace_creation(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        assert ws.root == tmp_path.resolve()
+
+    def test_workspace_invalid_root(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        with pytest.raises(ValueError, match="does not exist"):
+            ProjectWorkspace(root=tmp_path / "nonexistent")
+
+    def test_read_file(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        (tmp_path / "test.py").write_text("x = 1", encoding="utf-8")
+        ws = ProjectWorkspace(root=tmp_path)
+        assert ws.read_file("test.py") == "x = 1"
+
+    def test_read_file_not_found(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        with pytest.raises(FileNotFoundError):
+            ws.read_file("missing.py")
+
+    def test_path_traversal_blocked(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        with pytest.raises(ValueError, match="traversal"):
+            ws.read_file("../../etc/passwd")
+
+    def test_list_files(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        (tmp_path / "app.py").write_text("x = 1", encoding="utf-8")
+        (tmp_path / "test.py").write_text("y = 2", encoding="utf-8")
+        ws = ProjectWorkspace(root=tmp_path)
+        files = ws.list_files("*.py")
+        assert "app.py" in files
+        assert "test.py" in files
+
+    def test_list_files_skips_pycache(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        cache_dir = tmp_path / "__pycache__"
+        cache_dir.mkdir()
+        (cache_dir / "cached.pyc").write_text("", encoding="utf-8")
+        (tmp_path / "app.py").write_text("x = 1", encoding="utf-8")
+        ws = ProjectWorkspace(root=tmp_path)
+        files = ws.list_files("*")
+        assert all("__pycache__" not in f for f in files)
+
+    def test_file_tree(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        (tmp_path / "app.py").write_text("x = 1", encoding="utf-8")
+        sub = tmp_path / "src"
+        sub.mkdir()
+        (sub / "main.py").write_text("y = 2", encoding="utf-8")
+        ws = ProjectWorkspace(root=tmp_path)
+        tree = ws.file_tree()
+        assert "app.py" in tree
+        assert "src/" in tree
+
+    def test_propose_changes(self, tmp_path):
+        from crosscheck.team.chat import CodeBlock
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        blocks = [
+            CodeBlock(filename="new_file.py", language="python", content="x = 42")
+        ]
+        proposal = ws.propose_changes(blocks)
+        assert proposal.status == "pending"
+        assert len(proposal.changes) == 1
+        assert proposal.changes[0].filename == "new_file.py"
+        assert proposal.changes[0].action == "create"
+
+    def test_apply_proposal(self, tmp_path):
+        from crosscheck.team.chat import CodeBlock
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        blocks = [
+            CodeBlock(filename="new_file.py", language="python", content="x = 42")
+        ]
+        proposal = ws.propose_changes(blocks)
+        applied = ws.apply_proposal(proposal.id)
+        assert "new_file.py" in applied
+        assert (tmp_path / "new_file.py").read_text(encoding="utf-8") == "x = 42"
+        assert proposal.status == "accepted"
+
+    def test_rollback(self, tmp_path):
+        from crosscheck.team.chat import CodeBlock
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        blocks = [
+            CodeBlock(filename="rollback_test.py", language="python", content="x = 1")
+        ]
+        proposal = ws.propose_changes(blocks)
+        ws.apply_proposal(proposal.id)
+        assert (tmp_path / "rollback_test.py").exists()
+        rolled = ws.rollback(proposal.id)
+        assert "rollback_test.py" in rolled
+        assert not (tmp_path / "rollback_test.py").exists()
+
+    def test_rollback_edit(self, tmp_path):
+        from crosscheck.team.chat import CodeBlock
+        from crosscheck.team.workspace import ProjectWorkspace
+        (tmp_path / "existing.py").write_text("original", encoding="utf-8")
+        ws = ProjectWorkspace(root=tmp_path)
+        blocks = [
+            CodeBlock(filename="existing.py", language="python", content="modified")
+        ]
+        proposal = ws.propose_changes(blocks)
+        ws.apply_proposal(proposal.id)
+        assert (tmp_path / "existing.py").read_text(encoding="utf-8") == "modified"
+        ws.rollback(proposal.id)
+        assert (tmp_path / "existing.py").read_text(encoding="utf-8") == "original"
+
+    def test_proposal_not_found(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        with pytest.raises(ValueError, match="not found"):
+            ws.apply_proposal("nonexistent")
+
+
+# ── Coordinator + Observer Roles ──────────────────────────────────────────
+
+class TestCoordinatorObserver:
+    """Tests for Coordinator and Observer roles."""
+
+    def test_coordinator_role_exists(self):
+        assert TeamRole.COORDINATOR.value == "coordinator"
+
+    def test_observer_roles_exist(self):
+        assert TeamRole.OBSERVER_1.value == "observer_1"
+        assert TeamRole.OBSERVER_2.value == "observer_2"
+
+    def test_coordinator_in_default_team(self):
+        roles = {s.role for s in DEFAULT_TEAM}
+        assert TeamRole.COORDINATOR in roles
+
+    def test_observers_in_default_team(self):
+        roles = {s.role for s in DEFAULT_TEAM}
+        assert TeamRole.OBSERVER_1 in roles
+        assert TeamRole.OBSERVER_2 in roles
+
+    def test_coordinator_cannot_write_code(self):
+        spec = get_role_spec(TeamRole.COORDINATOR)
+        assert spec.can_write_code is False
+
+    def test_observers_cannot_write_code(self):
+        spec1 = get_role_spec(TeamRole.OBSERVER_1)
+        spec2 = get_role_spec(TeamRole.OBSERVER_2)
+        assert spec1.can_write_code is False
+        assert spec2.can_write_code is False
+
+    def test_coordinator_has_safety_prompt(self):
+        spec = get_role_spec(TeamRole.COORDINATOR)
+        assert "safety" in spec.system_prompt.lower() or "SAFETY" in spec.system_prompt
+
+    def test_observer_has_adversarial_prompt(self):
+        spec = get_role_spec(TeamRole.OBSERVER_1)
+        assert "adversarial" in spec.system_prompt.lower()
+
+    def test_diverse_models_for_observers(self):
+        """Observers should use different models (diverse model forcing)."""
+        spec1 = get_role_spec(TeamRole.OBSERVER_1)
+        spec2 = get_role_spec(TeamRole.OBSERVER_2)
+        assert spec1.default_model != spec2.default_model
+
+    def test_coordinator_command_aliases(self):
+        """@coordinator and aliases should route correctly."""
+        result = CommandParser.parse("@coordinator check consensus")
+        assert result.has_mentions is True
+        assert TeamRole.COORDINATOR in result.targets
+
+        result2 = CommandParser.parse("@safety review everything")
+        assert result2.has_mentions is True
+        assert TeamRole.COORDINATOR in result2.targets
+
+
+# ── Session with Workspace ──────────────────────────────────────────────────
+
+class TestSessionWorkspace:
+    """Tests for TeamSession with workspace integration."""
+
+    @pytest.mark.asyncio
+    async def test_session_accepts_workspace(self):
+        client = _mock_client()
+        session = TeamSession(client=client, workspace=None)
+        assert session.workspace is None
+
+    @pytest.mark.asyncio
+    async def test_session_with_workspace(self, tmp_path):
+        from crosscheck.team.workspace import ProjectWorkspace
+        ws = ProjectWorkspace(root=tmp_path)
+        (tmp_path / "app.py").write_text("x = 1", encoding="utf-8")
+        client = _mock_client(["APPROVED. Code looks correct."])
+        session = TeamSession(client=client, workspace=ws, max_rounds=1)
+        assert session.workspace is ws
+
+    @pytest.mark.asyncio
+    async def test_set_approval_decision(self):
+        client = _mock_client()
+        session = TeamSession(client=client)
+        session.set_approval_decision("accept")
+        assert session._approval_decision == "accept"
+        assert session._approval_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_set_approval_with_edits(self):
+        client = _mock_client()
+        session = TeamSession(client=client)
+        edits = {"app.py": "fixed content"}
+        session.set_approval_decision("edit", edits=edits)
+        assert session._approval_decision == "edit"
+        assert session._approval_edits == edits
+
+    @pytest.mark.asyncio
+    async def test_session_run_with_workspace_scans(self, tmp_path):
+        """Session with workspace should auto-scan and include project context."""
+        from crosscheck.team.workspace import ProjectWorkspace
+        (tmp_path / "main.py").write_text("def main(): pass", encoding="utf-8")
+        (tmp_path / "utils.py").write_text("def helper(): pass", encoding="utf-8")
+        ws = ProjectWorkspace(root=tmp_path)
+        client = _mock_client(["APPROVED. Code looks correct."])
+        session = TeamSession(client=client, workspace=ws, max_rounds=1)
+        history = await session.run(task="Add logging to main.py")
+        assert session.phase == SessionPhase.DONE
+        assert len(history.messages) > 0
+
+    @pytest.mark.asyncio
+    async def test_dissent_phase_in_session_run(self):
+        """Full session should go through DISSENT phase."""
+        phase_log = []
+
+        async def _chat(**kwargs):
+            return "APPROVED. Everything looks great."
+
+        client = MagicMock()
+        client.chat = _chat
+        session = TeamSession(client=client, max_rounds=1)
+
+        # Track phase changes
+        original_emit = session._emit
+        async def tracking_emit(msg):
+            phase_log.append(msg.phase.value if hasattr(msg.phase, 'value') else str(msg.phase))
+            await original_emit(msg)
+        session._emit = tracking_emit
+
+        await session.run(task="Test dissent phase")
+
+        # Should have gone through dissent
+        assert "dissent" in phase_log

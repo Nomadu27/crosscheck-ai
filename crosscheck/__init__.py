@@ -1,7 +1,7 @@
 """
 crosscheck-ai -- Multi-agent AI review & coding pipeline via OpenRouter.
 """
-__version__ = "0.3.0"
+__version__ = "2.0.0"
 
 from crosscheck.agents.analyzer import AnalyzerPool, AnalyzerReport
 from crosscheck.agents.coder import CoderAgent

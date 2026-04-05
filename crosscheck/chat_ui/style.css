@@ -75,6 +75,7 @@ body {
 }
 
 .header .status.connected { color: var(--color-coder); }
+.header .status.connecting { color: #FF8F00; }
 .header .status.disconnected { color: var(--color-security); }
 
 .header .theme-toggle {
